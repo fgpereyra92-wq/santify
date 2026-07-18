@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Repartidor</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- ========== LOGIN USUARIO ========== -->
+        <div id="loginUsuarioSection" class="section">
+            <div class="login-box">
+                <h1>🚚 Panel de Repartidor</h1>
+                <input type="text" id="userLogin" placeholder="Usuario" class="input-field">
+                <input type="password" id="userPass" placeholder="Contraseña" class="input-field">
+                <button type="button" onclick="loginUsuario()" class="btn-primary">Ingresar</button>
+                <div id="userLoginError" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- ========== PANEL USUARIO ========== -->
+        <div id="usuarioPanel" class="section" style="display:none;">
+            <div class="admin-header">
+                <h1 id="bienvenidaUsuario">👋 Hola, </h1>
+                <button type="button" onclick="logoutUsuario()" class="btn-danger">Cerrar Sesión</button>
+            </div>
+
+            <div class="status-bar">
+                <div class="status-item">
+                    <label>Estado:</label>
+                    <span id="estadoUsuario" class="badge-active">Activo</span>
+                </div>
+                <div class="status-item">
+                    <label>Disponibilidad:</label>
+                    <button type="button" id="btnDisponibilidad" onclick="toggleDisponibilidad()" class="btn-success">Disponible</button>
+                </div>
+                <div class="status-item">
+                    <label>Vehículo:</label>
+                    <span id="vehiculoUsuario">🚲 Bici</span>
+                </div>
+                <div class="status-item">
+                    <label>Liquidación:</label>
+                    <span id="liquidacionUsuario">$0</span>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button type="button" class="tab-btn active" onclick="showUserTab('pendientes')">📋 Pedidos Pendientes</button>
+                <button type="button" class="tab-btn" onclick="showUserTab('misPedidos')">📦 Mis Pedidos</button>
+                <button type="button" class="tab-btn" onclick="showUserTab('historial')">📜 Historial</button>
+            </div>
+
+            <div id="userTabPendientes" class="tab-content">
+                <h3>Pedidos Disponibles</h3>
+                <div id="pedidosPendientes" class="card-grid"></div>
+            </div>
+
+            <div id="userTabMisPedidos" class="tab-content" style="display:none;">
+                <h3>Mis Pedidos Asignados</h3>
+                <div id="misPedidos" class="card-grid"></div>
+            </div>
+
+            <div id="userTabHistorial" class="tab-content" style="display:none;">
+                <h3>Historial de Pedidos Completados</h3>
+                <div id="historialPedidos" class="card-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuración de Firebase -->
+    <script src="firebase-config.js"></script>
+    <!-- Lógica de la aplicación -->
+    <script src="app.js"></script>
+</body>
+</html>

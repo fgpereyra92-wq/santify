@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Entregas - Admin</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- ========== LOGIN ADMIN ========== -->
+        <div id="loginSection" class="section">
+            <div class="login-box">
+                <h1>🚚 Gestor de Entregas</h1>
+                <h2>Panel de Administración</h2>
+                <input type="password" id="adminPassword" placeholder="Clave de Administrador" class="input-field">
+                <button type="button" onclick="loginAdmin()" class="btn-primary">Ingresar</button>
+                <div id="loginError" class="error-message"></div>
+            </div>
+        </div>
+
+        <!-- ========== PANEL ADMIN ========== -->
+        <div id="adminPanel" class="section" style="display:none;">
+            <div class="admin-header">
+                <h1>👨‍💼 Panel de Administración</h1>
+                <button type="button" onclick="logout()" class="btn-danger">Cerrar Sesión</button>
+            </div>
+
+            <div class="tabs">
+                <button type="button" class="tab-btn active" onclick="showTab('usuarios')">👥 Usuarios</button>
+                <button type="button" class="tab-btn" onclick="showTab('pedidos')">📦 Pedidos</button>
+                <button type="button" class="tab-btn" onclick="showTab('liquidaciones')">💰 Liquidaciones</button>
+                <button type="button" class="tab-btn" onclick="showTab('admin')">💼 Admin</button>
+            </div>
+
+            <!-- ===== TAB USUARIOS ===== -->
+            <div id="tabUsuarios" class="tab-content">
+                <div class="action-bar">
+                    <h3>Gestión de Usuarios</h3>
+                    <button type="button" onclick="showForm('usuario')" class="btn-success">+ Nuevo Usuario</button>
+                </div>
+                
+                <div id="usuarioForm" class="form-container" style="display:none;">
+                    <h4>Crear Nuevo Usuario</h4>
+                    <input type="text" id="nombre" placeholder="Nombre completo" class="input-field">
+                    <input type="text" id="username" placeholder="Nombre de usuario" class="input-field">
+                    <input type="text" id="password" placeholder="Contraseña" class="input-field">
+                    <select id="vehiculo" class="input-field">
+                        <option value="bici">🚲 Bici</option>
+                        <option value="moto">🏍️ Moto</option>
+                        <option value="auto">🚗 Auto</option>
+                    </select>
+                    <div class="form-actions">
+                        <button type="button" onclick="crearUsuario()" class="btn-primary">Guardar</button>
+                        <button type="button" onclick="hideForm('usuario')" class="btn-secondary">Cancelar</button>
+                    </div>
+                </div>
+
+                <div id="listaUsuarios" class="card-grid"></div>
+            </div>
+
+            <!-- ===== TAB PEDIDOS ===== -->
+            <div id="tabPedidos" class="tab-content" style="display:none;">
+                <div class="action-bar">
+                    <h3>Gestión de Pedidos</h3>
+                    <button type="button" onclick="showForm('pedido')" class="btn-success">+ Nuevo Pedido</button>
+                </div>
+
+                <div id="pedidoForm" class="form-container" style="display:none;">
+                    <h4>Crear Nuevo Pedido</h4>
+                    <input type="text" id="descripcion" placeholder="Descripción del pedido" class="input-field">
+                    <input type="text" id="origen" placeholder="Origen" class="input-field">
+                    <input type="text" id="destino" placeholder="Destino" class="input-field">
+                    <input type="number" id="costoServicio" placeholder="Costo del servicio" class="input-field">
+                    <input type="number" id="pagoRepartidor" placeholder="Pago al repartidor" class="input-field">
+                    <select id="usuarioAsignado" class="input-field">
+                        <option value="">Sin asignar</option>
+                    </select>
+                    <div class="form-actions">
+                        <button type="button" onclick="crearPedido()" class="btn-primary">Guardar</button>
+                        <button type="button" onclick="hideForm('pedido')" class="btn-secondary">Cancelar</button>
+                    </div>
+                </div>
+
+                <div id="listaPedidos" class="card-grid"></div>
+            </div>
+
+            <!-- ===== TAB LIQUIDACIONES ===== -->
+            <div id="tabLiquidaciones" class="tab-content" style="display:none;">
+                <h3>📊 Liquidaciones de Repartidores</h3>
+                <div id="liquidacionesList" class="card-grid"></div>
+            </div>
+
+            <!-- ===== TAB ADMIN ===== -->
+            <div id="tabAdmin" class="tab-content" style="display:none;">
+                <div class="action-bar">
+                    <h3>💰 Liquidación del Administrador</h3>
+                </div>
+                <div class="card" style="max-width: 400px; margin: 0 auto;">
+                    <h4>Total Ganado</h4>
+                    <p style="font-size: 2.5rem; color: #ff6b35; text-align: center; margin: 20px 0;" id="totalAdmin">$0</p>
+                    <div class="card-actions" style="flex-direction: column; gap: 10px;">
+                        <button type="button" onclick="verLiquidacionAdmin()" class="btn-primary" style="width: 100%;">💰 Ver Detalle</button>
+                        <button type="button" onclick="descargarLiquidacionAdminTXT()" class="btn-success" style="width: 100%;">📥 Descargar TXT</button>
+                        <button type="button" onclick="cobrarLiquidacionAdmin()" class="btn-danger" style="width: 100%;">💰 Cobrar Liquidación</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuración de Firebase -->
+    <script src="firebase-config.js"></script>
+    <!-- Lógica de la aplicación -->
+    <script src="app.js"></script>
+</body>
+</html>

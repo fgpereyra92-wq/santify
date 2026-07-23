@@ -34,6 +34,7 @@
                 <button type="button" class="tab-btn" onclick="showTab('pedidos')">📦 Pedidos</button>
                 <button type="button" class="tab-btn" onclick="showTab('liquidaciones')">💰 Liquidaciones</button>
                 <button type="button" class="tab-btn" onclick="showTab('admin')">💼 Admin</button>
+                <button type="button" class="tab-btn" onclick="showTab('clientes')">🏢 Clientes</button>
             </div>
 
             <!-- ===== TAB USUARIOS ===== -->
@@ -112,6 +113,28 @@
         </div>
     </div>
 
+    <!-- ===== TAB CLIENTES ===== -->
+<div id="tabClientes" class="tab-content" style="display:none;">
+    <div class="action-bar">
+        <h3>Gestión de Clientes</h3>
+        <button type="button" onclick="showForm('cliente')" class="btn-success">+ Nuevo Cliente</button>
+    </div>
+    
+    <div id="clienteForm" class="form-container" style="display:none;">
+        <h4>Crear Nuevo Cliente</h4>
+        <input type="text" id="clienteNombre" placeholder="Nombre del cliente" class="input-field">
+        <input type="text" id="clienteDireccion" placeholder="Dirección" class="input-field">
+        <input type="text" id="clienteTelefono" placeholder="Teléfono" class="input-field">
+        <input type="email" id="clienteEmail" placeholder="Email" class="input-field">
+        <div class="form-actions">
+            <button type="button" onclick="crearCliente()" class="btn-primary">Guardar</button>
+            <button type="button" onclick="hideForm('cliente')" class="btn-secondary">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="listaClientes" class="card-grid"></div>
+</div>
+    
     <!-- Configuración de Firebase -->
     <script src="firebase-config.js"></script>
     <!-- Lógica de la aplicación -->

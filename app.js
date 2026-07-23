@@ -1,4 +1,8 @@
 // ============================================================
+// ===== app.js - SIN FUNCIONES DUPLICADAS DE FIREBASE =====
+// ============================================================
+
+// ============================================================
 // ===== CONFIGURACIÓN GENERAL =====
 // ============================================================
 const ADMIN_PASSWORD = 'LedZepp1';
@@ -14,7 +18,12 @@ let ultimoPedidoPendiente = null;
 let intervaloVerificacion = null;
 let notificacionSonidoHabilitada = true;
 
-// ===== REFERENCIA A FUNCIONES DE FIREBASE =====
+// ============================================================
+// ===== REFERENCIA A FUNCIONES DE FIREBASE (desde firebase-config.js) =====
+// ============================================================
+// Estas funciones YA ESTÁN DEFINIDAS en firebase-config.js
+// Solo las referenciamos aquí para usarlas
+
 const {
     escucharNuevosPedidos,
     dejarDeEscucharNuevosPedidos,
@@ -850,7 +859,6 @@ function renderPedidosAdmin(pedidos) {
     `}).join('');
 }
 
-// ===== CREAR PEDIDO CON PUSHUP (Notificación en tiempo real) =====
 async function crearPedido() {
     const descripcion = document.getElementById('descripcion').value;
     const origen = document.getElementById('origen').value;
@@ -875,12 +883,9 @@ async function crearPedido() {
             pagoRepartidor,
             gananciaAdmin: gananciaAdmin,
             usuarioAsignado: usuarioAsignado ? parseInt(usuarioAsignado) : null,
-            estado: usuarioAsignado ? 'asignado' : 'pendiente',
-            fechaCreacion: new Date().toISOString(),
-            fechaCompletado: null
+            estado: usuarioAsignado ? 'asignado' : 'pendiente'
         };
         
-        // Usar la función con pushup
         await crearPedidoConPushup(nuevoPedido);
         
         hideForm('pedido');
@@ -895,7 +900,6 @@ async function crearPedido() {
         await cargarLiquidacionAdmin();
         actualizarLiquidacionAdminUI();
         
-        // Mostrar mensaje de confirmación
         alert('✅ Pedido creado exitosamente. Los repartidores han sido notificados.');
     } catch (error) {
         console.error('Error:', error);
@@ -1109,7 +1113,6 @@ function mostrarAlertaPedidoNuevo(pedido) {
     }, 12000);
 }
 
-// ===== ESCUCHAR NUEVOS PEDIDOS EN TIEMPO REAL (PUSHUP) =====
 function iniciarEscuchaPushup() {
     if (!usuarioActual) return;
     
@@ -1118,25 +1121,17 @@ function iniciarEscuchaPushup() {
     escucharNuevosPedidos(function(nuevoPedido) {
         console.log('📦 Nuevo pedido detectado por PUSHUP:', nuevoPedido);
         
-        // Verificar que el pedido sea nuevo (no lo hemos visto antes)
         if (ultimoPedidoPendiente === null || 
             nuevoPedido.id !== ultimoPedidoPendiente.id) {
             
             ultimoPedidoPendiente = nuevoPedido;
             
-            // 1. Reproducir sonido
             reproducirSonidoNotificacion();
-            
-            // 2. Mostrar notificación del navegador
             mostrarNotificacionNavegador(
                 '📦 Nuevo Pedido Disponible',
                 `${nuevoPedido.descripcion}\n${nuevoPedido.origen} → ${nuevoPedido.destino}\n💰 $${nuevoPedido.pagoRepartidor}`
             );
-            
-            // 3. Mostrar alerta visual
             mostrarAlertaPedidoNuevo(nuevoPedido);
-            
-            // 4. Actualizar la lista de pedidos
             cargarPedidosUsuario(usuarioActual.id);
         }
     });
@@ -1145,6 +1140,21 @@ function iniciarEscuchaPushup() {
 function detenerEscuchaPushup() {
     dejarDeEscucharNuevosPedidos();
     console.log('🔇 Escucha de nuevos pedidos detenida');
+}
+
+function detenerVerificacionPedidos() {
+    detenerEscuchaPushup();
+    ultimoPedidoPendiente = null;
+}
+
+function toggleSonidoNotificaciones() {
+    notificacionSonidoHabilitada = !notificacionSonidoHabilitada;
+    const btn = document.querySelector('.btn-toggle-sonido');
+    if (btn) {
+        btn.textContent = notificacionSonidoHabilitada ? '🔊 Sonido ON' : '🔇 Sonido OFF';
+        btn.className = notificacionSonidoHabilitada ? 'btn-success btn-toggle-sonido' : 'btn-secondary btn-toggle-sonido';
+    }
+    console.log(`🔊 Sonido de notificaciones: ${notificacionSonidoHabilitada ? 'Activado' : 'Desactivado'}`);
 }
 
 // ============================================================
@@ -1188,22 +1198,11 @@ async function cargarPanelUsuario(usuario) {
             }
         }
         
-        // INICIAR PUSHUP - Escucha en tiempo real
         iniciarEscuchaPushup();
         
     } catch (error) {
         console.error('Error cargando panel usuario:', error);
     }
-}
-
-function toggleSonidoNotificaciones() {
-    notificacionSonidoHabilitada = !notificacionSonidoHabilitada;
-    const btn = document.querySelector('.btn-toggle-sonido');
-    if (btn) {
-        btn.textContent = notificacionSonidoHabilitada ? '🔊 Sonido ON' : '🔇 Sonido OFF';
-        btn.className = notificacionSonidoHabilitada ? 'btn-success btn-toggle-sonido' : 'btn-secondary btn-toggle-sonido';
-    }
-    console.log(`🔊 Sonido de notificaciones: ${notificacionSonidoHabilitada ? 'Activado' : 'Desactivado'}`);
 }
 
 async function verMiLiquidacion() {

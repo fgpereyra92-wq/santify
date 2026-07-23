@@ -1501,3 +1501,86 @@ console.log('📡 Pushup activado - Notificaciones en tiempo real');
 console.log('Admin: LedZepp1');
 console.log('Usuarios: carlos123 / reparto2024, maria456 / bici2024');
 console.log('🔔 Notificaciones activas: Sonido + Alerta visual + Push');
+
+// ============================================================
+// ===== FUNCIONES PARA CLIENTES =====
+// ============================================================
+
+async function cargarClientes() {
+    try {
+        const clientes = await window.firebaseFunctions.getClientes();
+        renderClientes(clientes);
+    } catch (error) {
+        console.error('Error cargando clientes:', error);
+    }
+}
+
+function renderClientes(clientes) {
+    const container = document.getElementById('listaClientes');
+    if (!container) return;
+    
+    if (!clientes || clientes.length === 0) {
+        container.innerHTML = '<p>No hay clientes registrados</p>';
+        return;
+    }
+    
+    container.innerHTML = clientes.map(c => `
+        <div class="card">
+            <h4>${c.nombre}</h4>
+            <p>📍 ${c.direccion}</p>
+            <p>📞 ${c.telefono}</p>
+            <p>✉️ ${c.email}</p>
+            <span class="badge ${c.activo ? 'badge-active' : 'badge-inactive'}">
+                ${c.activo ? '✅ Activo' : '❌ Inactivo'}
+            </span>
+            <div class="card-actions">
+                <button onclick="toggleClienteActivo(${c.id})" class="${c.activo ? 'btn-danger' : 'btn-success'}">
+                    ${c.activo ? 'Desactivar' : 'Activar'}
+                </button>
+                <button onclick="eliminarCliente(${c.id})" class="btn-danger">Eliminar</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function crearCliente() {
+    const nombre = document.getElementById('clienteNombre').value;
+    const direccion = document.getElementById('clienteDireccion').value;
+    const telefono = document.getElementById('clienteTelefono').value;
+    const email = document.getElementById('clienteEmail').value;
+    
+    if (!nombre || !direccion) {
+        alert('Nombre y dirección son obligatorios');
+        return;
+    }
+    
+    try {
+        const id = await window.firebaseFunctions.getNextId('clientes');
+        await window.firebaseFunctions.setCliente(id, {
+            nombre, direccion, telefono, email,
+            activo: true
+        });
+        hideForm('cliente');
+        document.getElementById('clienteNombre').value = '';
+        document.getElementById('clienteDireccion').value = '';
+        document.getElementById('clienteTelefono').value = '';
+        document.getElementById('clienteEmail').value = '';
+        await cargarClientes();
+    } catch (error) {
+        alert('Error al crear cliente');
+    }
+}
+
+async function toggleClienteActivo(id) {
+    const clientes = await window.firebaseFunctions.getClientes();
+    const cliente = clientes.find(c => c.id === id);
+    if (!cliente) return;
+    await window.firebaseFunctions.setCliente(id, { ...cliente, activo: !cliente.activo });
+    await cargarClientes();
+}
+
+async function eliminarCliente(id) {
+    if (!confirm('¿Eliminar este cliente?')) return;
+    await window.firebaseFunctions.deleteCliente(id);
+    await cargarClientes();
+}

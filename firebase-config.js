@@ -268,3 +268,27 @@ console.log('🔥 Firebase configurado correctamente');
 console.log('📡 Escuchando nuevos pedidos en tiempo real...');
 console.log('📦 Proyecto: santify-19aee');
 console.log('🌐 Database URL:', firebaseConfig.databaseURL);
+// ============================================================
+// ===== REGISTRAR SERVICE WORKER =====
+// ============================================================
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+        .then(reg => {
+            console.log('✅ Service Worker registrado');
+            // Solicitar permiso para notificaciones push
+            if ('PushManager' in window) {
+                reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: 'TU_VAPID_KEY'
+                }).then(subscription => {
+                    console.log('✅ Suscrito a notificaciones push');
+                }).catch(err => {
+                    console.log('❌ Error en suscripción push:', err);
+                });
+            }
+        })
+        .catch(err => {
+            console.log('❌ Error registrando Service Worker:', err);
+        });
+}

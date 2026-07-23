@@ -70,29 +70,28 @@
                 </div>
 
                 <div id="pedidoForm" class="form-container" style="display:none;">
-                    <h4>Crear Nuevo Pedido</h4>
-                    <input type="text" id="descripcion" placeholder="Descripción del pedido" class="input-field">
-                    <input type="text" id="origen" placeholder="Origen" class="input-field">
-                    <input type="text" id="destino" placeholder="Destino" class="input-field">
-                    <input type="number" id="costoServicio" placeholder="Costo del servicio" class="input-field">
-                    <input type="number" id="pagoRepartidor" placeholder="Pago al repartidor" class="input-field">
-                    <select id="usuarioAsignado" class="input-field">
-                        <option value="">Sin asignar</option>
-                    </select>
-                    <div class="form-actions">
-                        <button type="button" onclick="crearPedido()" class="btn-primary">Guardar</button>
-                        <button type="button" onclick="hideForm('pedido')" class="btn-secondary">Cancelar</button>
-                    </div>
-                </div>
-
-                <div id="listaPedidos" class="card-grid"></div>
-            </div>
-
-            <!-- ===== TAB LIQUIDACIONES ===== -->
-            <div id="tabLiquidaciones" class="tab-content" style="display:none;">
-                <h3>📊 Liquidaciones de Repartidores</h3>
-                <div id="liquidacionesList" class="card-grid"></div>
-            </div>
+    <h4>Crear Nuevo Pedido</h4>
+    <input type="text" id="descripcion" placeholder="Descripción del pedido" class="input-field">
+    
+    <!-- ORIGEN: Ahora es un select con clientes -->
+    <select id="clienteOrigen" class="input-field">
+        <option value="">Seleccionar cliente (origen)</option>
+    </select>
+    
+    <!-- Campo para origen manual (opcional) -->
+    <input type="text" id="origenManual" placeholder="O escribir origen manual" class="input-field">
+    
+    <input type="text" id="destino" placeholder="Destino" class="input-field">
+    <input type="number" id="costoServicio" placeholder="Costo del servicio" class="input-field">
+    <input type="number" id="pagoRepartidor" placeholder="Pago al repartidor" class="input-field">
+    <select id="usuarioAsignado" class="input-field">
+        <option value="">Sin asignar</option>
+    </select>
+    <div class="form-actions">
+        <button type="button" onclick="crearPedido()" class="btn-primary">Guardar</button>
+        <button type="button" onclick="hideForm('pedido')" class="btn-secondary">Cancelar</button>
+    </div>
+</div>
 
             <!-- ===== TAB ADMIN ===== -->
             <div id="tabAdmin" class="tab-content" style="display:none;">

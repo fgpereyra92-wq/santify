@@ -124,25 +124,25 @@ async function cargarPedidos() {
     try {
         pedidosCache = await window.firebaseFunctions.getPedidos();
         renderPedidosAdmin(pedidosCache);
+        
+        // Cargar usuarios en el select
+        const selectUsuario = document.getElementById('usuarioAsignado');
+        if (selectUsuario) {
+            const usuariosActivos = usuariosCache.filter(u => u.activo);
+            selectUsuario.innerHTML = '<option value="">Sin asignar</option>' + 
+                usuariosActivos.map(u => `<option value="${u.id}">${u.nombre} (${u.vehiculo})</option>`).join('');
+        }
+        
+        // CARGAR CLIENTES EN EL SELECT DE ORIGEN
+        const selectCliente = document.getElementById('clienteOrigen');
+        if (selectCliente) {
+            const clientes = await window.firebaseFunctions.getClientes();
+            const clientesActivos = clientes.filter(c => c.activo);
+            selectCliente.innerHTML = '<option value="">Seleccionar cliente (origen)</option>' + 
+                clientesActivos.map(c => `<option value="${c.id}">${c.nombre} - ${c.direccion}</option>`).join('');
+        }
     } catch (error) {
         console.error('Error cargando pedidos:', error);
-    }
-}
-
-async function cargarHistorial() {
-    try {
-        historialLiquidaciones = await window.firebaseFunctions.getHistorialLiquidaciones();
-    } catch (error) {
-        historialLiquidaciones = [];
-    }
-}
-
-async function cargarLiquidacionAdmin() {
-    try {
-        liquidacionAdmin = await window.firebaseFunctions.getLiquidacionAdmin();
-        document.getElementById('totalAdmin').textContent = `$${liquidacionAdmin.total || 0}`;
-    } catch (error) {
-        liquidacionAdmin = { total: 0, historial: [] };
     }
 }
 
@@ -282,35 +282,61 @@ function renderPedidosAdmin(pedidos) {
 
 async function crearPedido() {
     const descripcion = document.getElementById('descripcion').value;
-    const origen = document.getElementById('origen').value;
+    
+    // OBTENER ORIGEN: Del select de clientes o del campo manual
+    const clienteId = document.getElementById('clienteOrigen').value;
+    const origenManual = document.getElementById('origenManual').value;
+    let origen = '';
+    
+    if (clienteId) {
+        // Si seleccionó un cliente, usar su nombre como origen
+        const clientes = await window.firebaseFunctions.getClientes();
+        const cliente = clientes.find(c => c.id === parseInt(clienteId));
+        origen = cliente ? `${cliente.nombre} - ${cliente.direccion}` : origenManual;
+    } else if (origenManual) {
+        origen = origenManual;
+    } else {
+        alert('Debes seleccionar un cliente o escribir un origen manual');
+        return;
+    }
+    
     const destino = document.getElementById('destino').value;
     const costoServicio = parseFloat(document.getElementById('costoServicio').value);
     const pagoRepartidor = parseFloat(document.getElementById('pagoRepartidor').value);
     const usuarioAsignado = document.getElementById('usuarioAsignado').value;
     
     if (!descripcion || !origen || !destino || !costoServicio || !pagoRepartidor) {
-        alert('Todos los campos son obligatorios');
+        alert('Todos los campos son obligatorios (origen: cliente o manual)');
         return;
     }
     
     try {
         await window.firebaseFunctions.crearPedidoConPushup({
-            descripcion, origen, destino, costoServicio, pagoRepartidor,
+            descripcion, 
+            origen, 
+            destino, 
+            costoServicio, 
+            pagoRepartidor,
+            clienteOrigenId: clienteId || null,
             gananciaAdmin: costoServicio - pagoRepartidor,
             usuarioAsignado: usuarioAsignado ? parseInt(usuarioAsignado) : null,
             estado: usuarioAsignado ? 'asignado' : 'pendiente'
         });
+        
         hideForm('pedido');
         document.getElementById('descripcion').value = '';
-        document.getElementById('origen').value = '';
+        document.getElementById('clienteOrigen').value = '';
+        document.getElementById('origenManual').value = '';
         document.getElementById('destino').value = '';
         document.getElementById('costoServicio').value = '';
         document.getElementById('pagoRepartidor').value = '';
         document.getElementById('usuarioAsignado').value = '';
+        
         await cargarPedidos();
         await cargarUsuarios();
         alert('✅ Pedido creado exitosamente.');
     } catch (error) {
+        console.error('Error:', error);
         alert('Error al crear pedido');
     }
 }
@@ -637,13 +663,31 @@ async function cargarLiquidaciones() {
 }
 
 function showForm(tipo) {
-    document.getElementById(tipo === 'usuario' ? 'usuarioForm' : 'pedidoForm').style.display = 'block';
+    if (tipo === 'usuario') {
+        document.getElementById('usuarioForm').style.display = 'block';
+    } else if (tipo === 'pedido') {
+        document.getElementById('pedidoForm').style.display = 'block';
+        // CARGAR CLIENTES AL ABRIR EL FORMULARIO
+        cargarClientesEnSelect();
+    } else if (tipo === 'cliente') {
+        document.getElementById('clienteForm').style.display = 'block';
+    }
 }
 
-function hideForm(tipo) {
-    document.getElementById(tipo === 'usuario' ? 'usuarioForm' : 'pedidoForm').style.display = 'none';
+// NUEVA FUNCIÓN: Cargar clientes en el select
+async function cargarClientesEnSelect() {
+    const selectCliente = document.getElementById('clienteOrigen');
+    if (!selectCliente) return;
+    
+    try {
+        const clientes = await window.firebaseFunctions.getClientes();
+        const clientesActivos = clientes.filter(c => c.activo);
+        selectCliente.innerHTML = '<option value="">Seleccionar cliente (origen)</option>' + 
+            clientesActivos.map(c => `<option value="${c.id}">${c.nombre} - ${c.direccion}</option>`).join('');
+    } catch (error) {
+        console.error('Error cargando clientes:', error);
+    }
 }
-
 // ============================================================
 // ===== INICIO =====
 // ============================================================

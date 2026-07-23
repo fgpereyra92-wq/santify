@@ -1452,7 +1452,10 @@ function showTab(tab) {
         document.getElementById('tabAdmin').style.display = 'block';
         document.querySelectorAll('.tab-btn')[3].classList.add('active');
         cargarLiquidacionAdmin();
-        actualizarLiquidacionAdminUI();
+    } else if (tab === 'clientes') {
+        document.getElementById('tabClientes').style.display = 'block';
+        document.querySelectorAll('.tab-btn')[4].classList.add('active');
+        cargarClientes();
     }
 }
 
@@ -1480,6 +1483,8 @@ function showForm(tipo) {
         document.getElementById('usuarioForm').style.display = 'block';
     } else if (tipo === 'pedido') {
         document.getElementById('pedidoForm').style.display = 'block';
+    } else if (tipo === 'cliente') {
+        document.getElementById('clienteForm').style.display = 'block';
     }
 }
 
@@ -1488,6 +1493,8 @@ function hideForm(tipo) {
         document.getElementById('usuarioForm').style.display = 'none';
     } else if (tipo === 'pedido') {
         document.getElementById('pedidoForm').style.display = 'none';
+    } else if (tipo === 'cliente') {
+        document.getElementById('clienteForm').style.display = 'none';
     }
 }
 

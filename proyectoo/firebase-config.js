@@ -268,3 +268,45 @@ console.log('🔥 Firebase configurado correctamente');
 console.log('📡 Escuchando nuevos pedidos en tiempo real...');
 console.log('📦 Proyecto: santify-19aee');
 console.log('🌐 Database URL:', firebaseConfig.databaseURL);
+
+// ============================================================
+// ===== FUNCIONES PARA CLIENTES =====
+// ============================================================
+
+// Leer todos los clientes
+async function getClientes() {
+    try {
+        const snapshot = await database.ref('clientes').once('value');
+        const data = snapshot.val();
+        if (!data) return [];
+        return Object.keys(data).map(key => ({
+            id: parseInt(key),
+            ...data[key]
+        }));
+    } catch (error) {
+        console.error('Error obteniendo clientes:', error);
+        return [];
+    }
+}
+
+// Guardar cliente
+async function setCliente(id, clienteData) {
+    try {
+        await database.ref(`clientes/${id}`).set(clienteData);
+        return { id, ...clienteData };
+    } catch (error) {
+        console.error('Error guardando cliente:', error);
+        throw error;
+    }
+}
+
+// Eliminar cliente
+async function deleteCliente(id) {
+    try {
+        await database.ref(`clientes/${id}`).remove();
+        return true;
+    } catch (error) {
+        console.error('Error eliminando cliente:', error);
+        throw error;
+    }
+}

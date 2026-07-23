@@ -1,5 +1,5 @@
 // ============================================================
-// ===== app.js - SIN FUNCIONES DUPLICADAS DE FIREBASE =====
+// ===== app.js - VERSIÓN SIN DUPLICADOS =====
 // ============================================================
 
 // ============================================================
@@ -15,32 +15,13 @@ let adminAutenticado = false;
 
 // ===== VARIABLES PARA NOTIFICACIONES =====
 let ultimoPedidoPendiente = null;
-let intervaloVerificacion = null;
 let notificacionSonidoHabilitada = true;
 
 // ============================================================
-// ===== REFERENCIA A FUNCIONES DE FIREBASE (desde firebase-config.js) =====
+// ===== REFERENCIA A FUNCIONES DE FIREBASE =====
 // ============================================================
 // Estas funciones YA ESTÁN DEFINIDAS en firebase-config.js
-// Solo las referenciamos aquí para usarlas
-
-const {
-    escucharNuevosPedidos,
-    dejarDeEscucharNuevosPedidos,
-    getUsuarios,
-    setUsuario,
-    deleteUsuario,
-    getPedidos,
-    setPedido,
-    deletePedido,
-    getHistorialLiquidaciones,
-    setHistorialLiquidaciones,
-    getLiquidacionAdmin,
-    setLiquidacionAdmin,
-    getNextId,
-    crearPedidoConPushup,
-    database
-} = window.firebaseFunctions;
+// Solo las usamos aquí, NO las volvemos a definir
 
 // ============================================================
 // ===== MANEJO DE SESIÓN =====
@@ -162,7 +143,7 @@ async function verificarSesion() {
 
 async function cargarHistorialLiquidaciones() {
     try {
-        historialLiquidaciones = await getHistorialLiquidaciones();
+        historialLiquidaciones = await window.firebaseFunctions.getHistorialLiquidaciones();
     } catch (error) {
         historialLiquidaciones = JSON.parse(localStorage.getItem('historialLiquidaciones') || '[]');
     }
@@ -170,7 +151,7 @@ async function cargarHistorialLiquidaciones() {
 
 async function guardarHistorialLiquidaciones() {
     try {
-        await setHistorialLiquidaciones(historialLiquidaciones);
+        await window.firebaseFunctions.setHistorialLiquidaciones(historialLiquidaciones);
     } catch (error) {
         localStorage.setItem('historialLiquidaciones', JSON.stringify(historialLiquidaciones));
     }
@@ -178,7 +159,7 @@ async function guardarHistorialLiquidaciones() {
 
 async function cargarLiquidacionAdmin() {
     try {
-        liquidacionAdmin = await getLiquidacionAdmin();
+        liquidacionAdmin = await window.firebaseFunctions.getLiquidacionAdmin();
     } catch (error) {
         liquidacionAdmin = JSON.parse(localStorage.getItem('liquidacionAdmin') || '{"total":0,"historial":[]}');
     }
@@ -186,7 +167,7 @@ async function cargarLiquidacionAdmin() {
 
 async function guardarLiquidacionAdmin() {
     try {
-        await setLiquidacionAdmin(liquidacionAdmin);
+        await window.firebaseFunctions.setLiquidacionAdmin(liquidacionAdmin);
     } catch (error) {
         localStorage.setItem('liquidacionAdmin', JSON.stringify(liquidacionAdmin));
     }
@@ -213,7 +194,7 @@ function loginAdmin() {
 function logout() {
     if (!confirm('¿Cerrar sesión?')) return;
     limpiarSesion();
-    detenerVerificacionPedidos();
+    detenerEscuchaPushup();
     document.getElementById('loginSection').style.display = 'block';
     document.getElementById('adminPanel').style.display = 'none';
     document.getElementById('adminPassword').value = '';
@@ -228,7 +209,7 @@ async function loginUsuario() {
     const password = document.getElementById('userPass').value;
     
     try {
-        const usuarios = await getUsuarios();
+        const usuarios = await window.firebaseFunctions.getUsuarios();
         const usuario = usuarios.find(u => u.username === username && u.password === password);
         
         if (usuario) {
@@ -249,7 +230,7 @@ async function loginUsuario() {
 function logoutUsuario() {
     usuarioActual = null;
     limpiarSesion();
-    detenerVerificacionPedidos();
+    detenerEscuchaPushup();
     document.getElementById('loginUsuarioSection').style.display = 'block';
     document.getElementById('usuarioPanel').style.display = 'none';
     document.getElementById('userLogin').value = '';
@@ -285,7 +266,7 @@ function actualizarLiquidacionAdminUI() {
 
 async function cargarUsuarios() {
     try {
-        usuariosCache = await getUsuarios();
+        usuariosCache = await window.firebaseFunctions.getUsuarios();
         renderUsuarios(usuariosCache);
     } catch (error) {
         console.error('Error cargando usuarios:', error);
@@ -345,7 +326,7 @@ async function toggleUsuarioActivo(id) {
         const usuario = usuariosCache.find(u => u.id === id);
         if (!usuario) return;
         
-        await setUsuario(id, { ...usuario, activo: !usuario.activo });
+        await window.firebaseFunctions.setUsuario(id, { ...usuario, activo: !usuario.activo });
         await cargarUsuarios();
         await cargarPedidos();
     } catch (error) {
@@ -369,7 +350,7 @@ async function toggleDisponibilidadAdmin(id) {
     if (!confirm(`¿Cambiar disponibilidad de ${usuario.nombre} a "${mensaje}"?`)) return;
     
     try {
-        await setUsuario(id, { ...usuario, disponible: nuevoEstado });
+        await window.firebaseFunctions.setUsuario(id, { ...usuario, disponible: nuevoEstado });
         usuario.disponible = nuevoEstado;
         await cargarUsuarios();
         await cargarPedidos();
@@ -383,7 +364,7 @@ async function toggleDisponibilidadAdmin(id) {
 async function eliminarUsuario(id) {
     if (!confirm('¿Eliminar este usuario?')) return;
     try {
-        await deleteUsuario(id);
+        await window.firebaseFunctions.deleteUsuario(id);
         await cargarUsuarios();
         await cargarPedidos();
     } catch (error) {
@@ -404,7 +385,7 @@ async function crearUsuario() {
     }
     
     try {
-        const id = await getNextId('usuarios');
+        const id = await window.firebaseFunctions.getNextId('usuarios');
         const nuevoUsuario = {
             nombre,
             username,
@@ -416,7 +397,7 @@ async function crearUsuario() {
             pedidosCompletados: 0,
             ajustesLiquidacion: []
         };
-        await setUsuario(id, nuevoUsuario);
+        await window.firebaseFunctions.setUsuario(id, nuevoUsuario);
         hideForm('usuario');
         document.getElementById('nombre').value = '';
         document.getElementById('username').value = '';
@@ -493,7 +474,7 @@ async function aplicarAjuste(id) {
         
         ajustesActuales.push(nuevoAjuste);
         
-        await setUsuario(id, {
+        await window.firebaseFunctions.setUsuario(id, {
             ...usuario,
             ajustesLiquidacion: ajustesActuales,
             liquidacionTotal: (usuario.liquidacionTotal || 0) + monto
@@ -577,7 +558,7 @@ async function descargarLiquidacionTXT(id) {
     const usuario = usuariosCache.find(u => u.id === id);
     if (!usuario) return;
     
-    const pedidos = await getPedidos();
+    const pedidos = await window.firebaseFunctions.getPedidos();
     const pedidosUsuario = pedidos.filter(p => p.usuarioAsignado === id && p.estado === 'completado');
     const ajustes = usuario.ajustesLiquidacion || [];
     
@@ -642,7 +623,7 @@ async function pagarLiquidacion(id) {
         });
         await guardarHistorialLiquidaciones();
         
-        await setUsuario(id, {
+        await window.firebaseFunctions.setUsuario(id, {
             ...usuario,
             liquidacionTotal: 0,
             pedidosCompletados: 0,
@@ -728,7 +709,7 @@ async function verLiquidacionAdmin() {
 async function descargarLiquidacionAdminTXT() {
     await cargarLiquidacionAdmin();
     
-    const pedidos = await getPedidos();
+    const pedidos = await window.firebaseFunctions.getPedidos();
     const pedidosCompletados = pedidos.filter(p => p.estado === 'completado');
     
     const contenido = `
@@ -775,7 +756,7 @@ async function cobrarLiquidacionAdmin() {
         liquidacionAdmin.historial.push({
             fecha: new Date().toISOString(),
             monto: montoCobrado,
-            detalle: `Cobro de liquidación - ${(await getPedidos()).filter(p => p.estado === 'completado').length} pedidos completados`
+            detalle: `Cobro de liquidación - ${(await window.firebaseFunctions.getPedidos()).filter(p => p.estado === 'completado').length} pedidos completados`
         });
         liquidacionAdmin.total = 0;
         await guardarLiquidacionAdmin();
@@ -815,7 +796,7 @@ Monto cobrado: $${montoCobrado}
 
 async function cargarPedidos() {
     try {
-        pedidosCache = await getPedidos();
+        pedidosCache = await window.firebaseFunctions.getPedidos();
         renderPedidosAdmin(pedidosCache);
         
         const select = document.getElementById('usuarioAsignado');
@@ -886,7 +867,7 @@ async function crearPedido() {
             estado: usuarioAsignado ? 'asignado' : 'pendiente'
         };
         
-        await crearPedidoConPushup(nuevoPedido);
+        await window.firebaseFunctions.crearPedidoConPushup(nuevoPedido);
         
         hideForm('pedido');
         document.getElementById('descripcion').value = '';
@@ -927,7 +908,7 @@ async function asignarPedido(id) {
     try {
         const pedido = pedidosCache.find(p => p.id === id);
         if (pedido) {
-            await setPedido(id, {
+            await window.firebaseFunctions.setPedido(id, {
                 ...pedido,
                 usuarioAsignado: usuariosActivos[index].id,
                 estado: 'asignado'
@@ -950,7 +931,7 @@ async function completarPedido(id) {
     }
     
     try {
-        await setPedido(id, {
+        await window.firebaseFunctions.setPedido(id, {
             ...pedido,
             estado: 'completado',
             fechaCompletado: new Date().toISOString()
@@ -959,7 +940,7 @@ async function completarPedido(id) {
         if (pedido.usuarioAsignado) {
             const usuario = usuariosCache.find(u => u.id === pedido.usuarioAsignado);
             if (usuario) {
-                await setUsuario(usuario.id, {
+                await window.firebaseFunctions.setUsuario(usuario.id, {
                     ...usuario,
                     liquidacionTotal: (usuario.liquidacionTotal || 0) + pedido.pagoRepartidor,
                     pedidosCompletados: (usuario.pedidosCompletados || 0) + 1
@@ -983,7 +964,7 @@ async function completarPedido(id) {
 async function eliminarPedido(id) {
     if (!confirm('¿Eliminar este pedido?')) return;
     try {
-        await deletePedido(id);
+        await window.firebaseFunctions.deletePedido(id);
         await cargarPedidos();
         await cargarUsuarios();
         await cargarLiquidacionAdmin();
@@ -1000,7 +981,7 @@ async function eliminarPedido(id) {
 
 async function cargarLiquidaciones() {
     try {
-        const usuarios = await getUsuarios();
+        const usuarios = await window.firebaseFunctions.getUsuarios();
         const container = document.getElementById('liquidacionesList');
         if (!container) return;
         
@@ -1118,7 +1099,7 @@ function iniciarEscuchaPushup() {
     
     console.log('📡 Iniciando escucha de nuevos pedidos en tiempo real...');
     
-    escucharNuevosPedidos(function(nuevoPedido) {
+    window.firebaseFunctions.escucharNuevosPedidos(function(nuevoPedido) {
         console.log('📦 Nuevo pedido detectado por PUSHUP:', nuevoPedido);
         
         if (ultimoPedidoPendiente === null || 
@@ -1138,13 +1119,8 @@ function iniciarEscuchaPushup() {
 }
 
 function detenerEscuchaPushup() {
-    dejarDeEscucharNuevosPedidos();
+    window.firebaseFunctions.dejarDeEscucharNuevosPedidos();
     console.log('🔇 Escucha de nuevos pedidos detenida');
-}
-
-function detenerVerificacionPedidos() {
-    detenerEscuchaPushup();
-    ultimoPedidoPendiente = null;
 }
 
 function toggleSonidoNotificaciones() {
@@ -1247,7 +1223,7 @@ async function toggleDisponibilidad() {
     const nuevoEstado = !usuarioActual.disponible;
     
     try {
-        await setUsuario(usuarioActual.id, {
+        await window.firebaseFunctions.setUsuario(usuarioActual.id, {
             ...usuarioActual,
             disponible: nuevoEstado
         });
@@ -1276,7 +1252,7 @@ async function toggleDisponibilidad() {
 
 async function cargarPedidosUsuario(usuarioId) {
     try {
-        const pedidos = await getPedidos();
+        const pedidos = await window.firebaseFunctions.getPedidos();
         renderPedidosUsuario(pedidos, usuarioId);
     } catch (error) {
         console.error('Error cargando pedidos usuario:', error);
@@ -1354,7 +1330,7 @@ async function tomarPedido(id) {
     try {
         const pedido = pedidosCache.find(p => p.id === id);
         if (pedido) {
-            await setPedido(id, {
+            await window.firebaseFunctions.setPedido(id, {
                 ...pedido,
                 usuarioAsignado: usuarioActual.id,
                 estado: 'asignado'
@@ -1374,7 +1350,7 @@ async function completarPedidoUsuario(id) {
     if (!confirm('¿Completar este pedido?')) return;
     
     try {
-        const pedidosActuales = await getPedidos();
+        const pedidosActuales = await window.firebaseFunctions.getPedidos();
         const pedido = pedidosActuales.find(p => p.id === id);
         
         if (!pedido) {
@@ -1382,7 +1358,7 @@ async function completarPedidoUsuario(id) {
             return;
         }
         
-        await setPedido(id, {
+        await window.firebaseFunctions.setPedido(id, {
             ...pedido,
             estado: 'completado',
             fechaCompletado: new Date().toISOString()
@@ -1394,7 +1370,7 @@ async function completarPedidoUsuario(id) {
                 const nuevaLiquidacion = (usuarioActualizado.liquidacionTotal || 0) + pedido.pagoRepartidor;
                 const nuevosPedidos = (usuarioActualizado.pedidosCompletados || 0) + 1;
                 
-                await setUsuario(usuarioActual.id, {
+                await window.firebaseFunctions.setUsuario(usuarioActual.id, {
                     ...usuarioActualizado,
                     liquidacionTotal: nuevaLiquidacion,
                     pedidosCompletados: nuevosPedidos

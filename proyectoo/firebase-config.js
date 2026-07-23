@@ -259,6 +259,9 @@ window.firebaseFunctions = {
     getNextId,
     crearPedidoConPushup,
     database
+    getClientes,
+    setCliente,
+    deleteCliente
 };
 
 // ============================================================

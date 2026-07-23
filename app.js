@@ -668,4 +668,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
 console.log('🚚 Gestor de Entregas v3.0 - Firebase');
 console.log('Admin: LedZepp1');
+// ===== RECONEXIÓN AUTOMÁTICA =====
+function iniciarReconexion() {
+    const dbRef = window.firebaseFunctions.database.ref('.info/connected');
+    dbRef.on('value', function(snap) {
+        if (snap.val() === true) {
+            console.log('✅ Reconectado a Firebase');
+            // Recargar datos automáticamente
+            if (usuarioActual) {
+                cargarPedidosUsuario(usuarioActual.id);
+            }
+        } else {
+            console.log('⚠️ Desconectado de Firebase - Reintentando...');
+        }
+    });
+}
+
+// Llamar al iniciar
+document.addEventListener('DOMContentLoaded', function() {
+    iniciarReconexion();
+});
 console.log('Usuarios: carlos123 / reparto2024, maria456 / bici2024');

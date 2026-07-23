@@ -35,19 +35,30 @@ database.ref('.info/connected').on('value', function(snap) {
 
 // Función para escuchar nuevos pedidos en tiempo real (PUSHUP)
 function escucharNuevosPedidos(callback) {
-    // Escuchar solo pedidos nuevos (pendientes)
     const pedidosRef = database.ref('pedidos');
     
-    // Usar 'child_added' para detectar NUEVOS pedidos (no todos)
+    // Usar keepSynced para mantener la conexión activa
+    pedidosRef.keepSynced(true);
+    
     pedidosRef.orderByChild('estado').equalTo('pendiente').on('child_added', function(snapshot) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
-        
-        // Llamar al callback con el nuevo pedido
         if (pedido && pedido.estado === 'pendiente') {
+            // Enviar notificación push
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'PUSH',
+                    data: {
+                        title: '📦 Nuevo Pedido',
+                        body: `${pedido.descripcion}\n${pedido.origen} → ${pedido.destino}\n💰 $${pedido.pagoRepartidor}`,
+                        url: '/usuarios.html'
+                    }
+                });
+            }
             callback({ id, ...pedido });
         }
     });
+}
     
     // También escuchar cambios en pedidos existentes (para actualizaciones)
     pedidosRef.on('child_changed', function(snapshot) {

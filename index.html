@@ -3,14 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Entregas - Admin</title>
+    <title>Gestor de Entregas v3.0</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div class="container">
+        
+        <!-- ============================================ -->
         <!-- ===== LOGIN ADMIN ===== -->
+        <!-- ============================================ -->
         <div id="loginSection" class="section">
             <div class="login-box">
                 <h1>🚚 Gestor de Entregas</h1>
@@ -18,10 +21,40 @@
                 <input type="password" id="adminPassword" placeholder="Clave de Administrador" class="input-field">
                 <button type="button" onclick="loginAdmin()" class="btn-primary">Ingresar</button>
                 <div id="loginError" class="error-message"></div>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
+                    <p style="text-align: center; margin-bottom: 15px;">¿Eres repartidor?</p>
+                    <button type="button" onclick="mostrarLoginUsuario()" class="btn-secondary" style="width: 100%;">
+                        👤 Ingresar como Repartidor
+                    </button>
+                </div>
             </div>
         </div>
 
+        <!-- ============================================ -->
+        <!-- ===== LOGIN USUARIO (REPARTIDOR) ===== -->
+        <!-- ============================================ -->
+        <div id="loginUsuarioSection" class="section" style="display:none;">
+            <div class="login-box">
+                <h1>🚚 Gestor de Entregas</h1>
+                <h2>Panel de Repartidor</h2>
+                <input type="text" id="userLogin" placeholder="Usuario" class="input-field">
+                <input type="password" id="userPass" placeholder="Contraseña" class="input-field">
+                <button type="button" onclick="loginUsuario()" class="btn-primary">Ingresar</button>
+                <div id="userLoginError" class="error-message"></div>
+                
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
+                    <p style="text-align: center; margin-bottom: 15px;">¿Eres administrador?</p>
+                    <button type="button" onclick="mostrarLoginAdmin()" class="btn-secondary" style="width: 100%;">
+                        👨‍💼 Ingresar como Administrador
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
         <!-- ===== PANEL ADMIN ===== -->
+        <!-- ============================================ -->
         <div id="adminPanel" class="section" style="display:none;">
             <div class="admin-header">
                 <h1>👨‍💼 Panel de Administración</h1>
@@ -124,9 +157,84 @@
                 </div>
             </div>
         </div>
+
+        <!-- ============================================ -->
+        <!-- ===== PANEL USUARIO (REPARTIDOR) ===== -->
+        <!-- ============================================ -->
+        <div id="usuarioPanel" class="section" style="display:none;">
+            <div class="admin-header">
+                <h1 id="bienvenidaUsuario">👋 Hola, Repartidor</h1>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" onclick="activarSonidoManual()" class="btn-warning" id="btnActivarSonido">
+                        🔊 Activar Sonido
+                    </button>
+                    <button type="button" onclick="logoutUsuario()" class="btn-danger">Cerrar Sesión</button>
+                </div>
+            </div>
+
+            <!-- Estado y estadísticas del repartidor -->
+            <div class="stats-bar">
+                <div class="stat-card">
+                    <span id="vehiculoUsuario">🚲 Bici</span>
+                </div>
+                <div class="stat-card">
+                    <span>💰 Liquidación: </span>
+                    <strong id="liquidacionUsuario" style="color: #28a745;">$0</strong>
+                </div>
+                <div class="stat-card">
+                    <span id="estadoUsuario" class="badge-active">✅ Activo</span>
+                </div>
+                <div class="stat-card">
+                    <button type="button" id="btnDisponibilidad" onclick="toggleDisponibilidad()" class="btn-success">
+                        🟢 Disponible
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs del repartidor -->
+            <div class="tabs">
+                <button type="button" class="tab-btn active" onclick="showUserTab('pendientes')">📋 Pendientes</button>
+                <button type="button" class="tab-btn" onclick="showUserTab('misPedidos')">📦 Mis Pedidos</button>
+                <button type="button" class="tab-btn" onclick="showUserTab('historial')">📜 Historial</button>
+            </div>
+
+            <!-- TAB PENDIENTES -->
+            <div id="userTabPendientes" class="tab-content">
+                <h3>📋 Pedidos Disponibles</h3>
+                <div id="pedidosPendientes" class="card-grid"></div>
+            </div>
+
+            <!-- TAB MIS PEDIDOS -->
+            <div id="userTabMisPedidos" class="tab-content" style="display:none;">
+                <h3>📦 Mis Pedidos Asignados</h3>
+                <div id="misPedidos" class="card-grid"></div>
+            </div>
+
+            <!-- TAB HISTORIAL -->
+            <div id="userTabHistorial" class="tab-content" style="display:none;">
+                <h3>📜 Historial de Pedidos Completados</h3>
+                <div id="historialPedidos" class="card-grid"></div>
+            </div>
+        </div>
+        
     </div>
 
+    <!-- Firebase Config -->
     <script src="firebase-config.js"></script>
+    <!-- App Logic -->
     <script src="app.js"></script>
+    
+    <!-- Funciones adicionales para cambiar entre login admin y usuario -->
+    <script>
+        function mostrarLoginUsuario() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('loginUsuarioSection').style.display = 'block';
+        }
+        
+        function mostrarLoginAdmin() {
+            document.getElementById('loginUsuarioSection').style.display = 'none';
+            document.getElementById('loginSection').style.display = 'block';
+        }
+    </script>
 </body>
 </html>

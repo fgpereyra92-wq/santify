@@ -30,18 +30,37 @@ database.ref('.info/connected').on('value', function(snap) {
 });
 
 // ============================================================
-// 🔊 SONIDO
+// 🔊 SONIDO - VERSIÓN MEJORADA PARA MÓVILES
 // ============================================================
 
 let audioElement = null;
-let audioInicializado = false;
+let audioContext = null;
+let sonidoInicializado = false;
 
-function initAudioElement() {
+// Inicializar AudioContext (necesario para móviles)
+function initAudioContext() {
+    try {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        return true;
+    } catch (e) {
+        console.warn('Error inicializando AudioContext:', e);
+        return false;
+    }
+}
+
+// Cargar archivo de sonido
+function getAudioElement() {
     if (audioElement) return audioElement;
     try {
         audioElement = new Audio('sonido.mp3');
         audioElement.preload = 'auto';
         audioElement.load();
+        audioElement.volume = 0.8;
         return audioElement;
     } catch (e) {
         console.warn('Error cargando sonido:', e);
@@ -49,32 +68,95 @@ function initAudioElement() {
     }
 }
 
+// Activar sonido (se llama al tocar la pantalla)
 function activarSonido() {
-    if (audioInicializado) return;
+    if (sonidoInicializado) return;
+    
+    // Inicializar AudioContext
+    initAudioContext();
+    
+    // Reproducir un "click" silencioso para activar el audio
     try {
-        const audio = initAudioElement();
+        const audio = getAudioElement();
         if (audio) {
-            audio.volume = 0.1;
+            audio.volume = 0.01;
             audio.play().then(() => {
                 audio.pause();
                 audio.currentTime = 0;
-                audioInicializado = true;
-                console.log('🔊 Sonido activado');
-            }).catch(e => {});
+                audio.volume = 0.8;
+                sonidoInicializado = true;
+                console.log('🔊 Sonido activado correctamente');
+            }).catch(e => {
+                console.warn('Error activando sonido:', e);
+            });
         }
-    } catch (e) {}
+    } catch (e) {
+        console.warn('Error en activarSonido:', e);
+    }
 }
 
+// Reproducir sonido de notificación
 function reproducirSonido() {
+    if (!sonidoInicializado) {
+        // Intentar activar sonido primero
+        activarSonido();
+        // Esperar un poco y reproducir
+        setTimeout(() => {
+            reproducirSonidoReal();
+        }, 100);
+        return;
+    }
+    reproducirSonidoReal();
+}
+
+function reproducirSonidoReal() {
     try {
-        const audio = initAudioElement();
+        // Primero intentar con AudioContext para más control
+        if (audioContext && audioContext.state === 'running') {
+            // Crear un tono corto como respaldo
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioContext.currentTime);
+            gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.15);
+            osc.start(audioContext.currentTime);
+            osc.stop(audioContext.currentTime + 0.15);
+            
+            // Segundo tono
+            setTimeout(() => {
+                try {
+                    const osc2 = audioContext.createOscillator();
+                    const gain2 = audioContext.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(audioContext.destination);
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(1100, audioContext.currentTime);
+                    gain2.gain.setValueAtTime(0.25, audioContext.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+                    osc2.start(audioContext.currentTime);
+                    osc2.stop(audioContext.currentTime + 0.2);
+                } catch (e) {}
+            }, 180);
+        }
+        
+        // También reproducir el MP3 (más familiar para usuarios)
+        const audio = getAudioElement();
         if (audio) {
             audio.currentTime = 0;
             audio.volume = 0.8;
-            audio.play().catch(e => console.warn('Error reproduciendo:', e));
+            audio.play().catch(e => console.warn('Error con MP3:', e));
         }
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
-    } catch (e) {}
+        
+        // Vibración para móviles
+        if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100, 50, 200]);
+        }
+    } catch (e) {
+        console.warn('Error en reproducirSonido:', e);
+    }
 }
 
 // ============================================================
@@ -89,8 +171,11 @@ function escucharNuevosPedidos(callback) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
         if (pedido && pedido.estado === 'pendiente') {
-            console.log('📦 Nuevo pedido:', pedido.descripcion);
-            reproducirSonido();
+            console.log('📦 Nuevo pedido #' + id + ': ' + pedido.descripcion);
+            // Reproducir sonido con fuerza
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => { reproducirSonido(); }, i * 300);
+            }
             callback({ id, ...pedido });
         }
     });
@@ -259,3 +344,4 @@ window.getFirebase = function() {
 };
 
 console.log('🔥 Firebase OK');
+console.log('🔊 Sonido preparado');

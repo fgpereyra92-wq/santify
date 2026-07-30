@@ -1,5 +1,5 @@
 // ============================================================
-// ===== app.js =====
+// ===== app.js - VERSIÓN CORREGIDA =====
 // ============================================================
 
 const ADMIN_PASSWORD = 'LedZepp1';
@@ -10,7 +10,6 @@ let clientesCache = [];
 let historialLiquidaciones = [];
 let liquidacionAdmin = { total: 0, historial: [] };
 let ultimoPedidoPendiente = null;
-let sonidoActivado = false;
 
 // ============================================================
 // ===== FIREBASE HELPER =====
@@ -24,18 +23,29 @@ function fb() {
     return window.firebaseFunctions;
 }
 
+// ============================================================
+// ===== ACTIVAR SONIDO GLOBAL =====
+// ============================================================
+
+let sonidoActivado = false;
+
 function activarSonidoGlobal() {
     if (sonidoActivado) return;
     const f = fb();
     if (f && f.activarSonido) {
         f.activarSonido();
         sonidoActivado = true;
-        console.log('🔊 Sonido activado');
+        console.log('🔊 Sonido activado globalmente');
     }
 }
 
-document.addEventListener('click', function() { activarSonidoGlobal(); });
-document.addEventListener('touchstart', function() { activarSonidoGlobal(); });
+// Activar sonido con cualquier interacción del usuario
+document.addEventListener('click', function() { 
+    activarSonidoGlobal(); 
+});
+document.addEventListener('touchstart', function() { 
+    activarSonidoGlobal(); 
+});
 
 // ============================================================
 // ===== SESIÓN =====
@@ -97,6 +107,8 @@ async function loginUsuario() {
             document.getElementById('usuarioPanel').style.display = 'block';
             await cargarPanelUsuario(usuario);
             document.getElementById('userLoginError').textContent = '';
+            // Activar sonido al iniciar sesión
+            setTimeout(activarSonidoGlobal, 500);
         } else {
             document.getElementById('userLoginError').textContent = '❌ Usuario o contraseña incorrectos';
         }
@@ -206,7 +218,7 @@ function renderUsuarios(usuarios) {
                 <button onclick="toggleDisponibilidadAdmin(${u.id})" class="${u.disponible ? 'btn-secondary' : 'btn-success'}" ${!u.activo ? 'disabled' : ''}>
                     ${u.disponible ? '⏸️ Pausar' : '▶️ Activar'}
                 </button>
-                <button onclick="verLiquidacion(${u.id})" class="btn-primary">💰 Liquidación</button>
+                <button onclick="verLiquidacionDetalle(${u.id})" class="btn-primary">💰 Liquidación</button>
                 <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
                 <button onclick="eliminarUsuario(${u.id})" class="btn-danger">Eliminar</button>
             </div>
@@ -263,6 +275,102 @@ function renderPedidosAdmin(pedidos) {
             </div>
         </div>
     `}).join('');
+}
+
+// ============================================================
+// ===== LIQUIDACIONES - INTERFAZ COMPLETA =====
+// ============================================================
+
+async function verLiquidacionDetalle(id) {
+    const u = usuariosCache.find(u => u.id === id);
+    if (!u) return;
+    
+    // Buscar pedidos completados del usuario
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    const pedidos = await f.getPedidos();
+    const pedidosCompletados = pedidos.filter(p => p.usuarioAsignado === id && p.estado === 'completado');
+    
+    // Crear modal
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;z-index:1000;padding:20px;';
+    
+    modal.innerHTML = `
+        <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;padding:25px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a2a;padding-bottom:15px;margin-bottom:20px;">
+                <h2 style="color:#ff6b35;margin:0;">💰 ${u.nombre}</h2>
+                <button onclick="this.closest('.modal-overlay').remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">✕</button>
+            </div>
+            <div style="background:#2a2a2a;padding:15px;border-radius:8px;margin-bottom:20px;">
+                <p><strong>Total a pagar:</strong> $${u.liquidacionTotal || 0}</p>
+                <p><strong>Pedidos completados:</strong> ${u.pedidosCompletados || 0}</p>
+                <p><strong>Vehículo:</strong> ${u.vehiculo}</p>
+            </div>
+            
+            <h4 style="color:#ff6b35;margin-bottom:10px;">📦 Pedidos completados</h4>
+            <div style="max-height:200px;overflow-y:auto;">
+                ${pedidosCompletados.length === 0 ? '<p style="color:#888;">No hay pedidos completados</p>' :
+                    pedidosCompletados.map(p => `
+                        <div style="background:#2a2a2a;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #28a745;">
+                            <p style="margin:3px 0;">${p.descripcion}</p>
+                            <p style="margin:3px 0;font-size:0.9rem;color:#b0b0b0;">📍 ${p.origen} → ${p.destino}</p>
+                            <p style="margin:3px 0;color:#28a745;">💰 $${p.pagoRepartidor}</p>
+                        </div>
+                    `).join('')}
+            </div>
+            
+            <div style="display:flex;gap:10px;margin-top:20px;">
+                <button onclick="pagarLiquidacion(${u.id})" style="flex:1;padding:12px;background:#28a745;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">
+                    ✅ Pagar Liquidación
+                </button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex:1;padding:12px;background:#6c757d;color:white;border:none;border-radius:6px;cursor:pointer;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function pagarLiquidacion(id) {
+    if (!confirm('¿Confirmar pago? Esto reiniciará el contador a $0')) return;
+    
+    const u = usuariosCache.find(u => u.id === id);
+    if (!u) return;
+    
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    
+    try {
+        // Guardar en historial
+        const historial = await f.getHistorial();
+        historial.push({
+            usuarioId: id,
+            usuarioNombre: u.nombre,
+            monto: u.liquidacionTotal || 0,
+            fecha: new Date().toISOString(),
+            detalle: 'Pago de liquidación - ' + (u.pedidosCompletados || 0) + ' pedidos'
+        });
+        await f.setHistorial(historial);
+        
+        // Resetear contador
+        await f.setUsuario(id, {
+            ...u,
+            liquidacionTotal: 0,
+            pedidosCompletados: 0,
+            ajustesLiquidacion: []
+        });
+        
+        // Cerrar modal y recargar
+        document.querySelector('.modal-overlay')?.remove();
+        await cargarUsuarios();
+        await cargarLiquidaciones();
+        alert('✅ Liquidación pagada exitosamente');
+    } catch (error) {
+        alert('Error al pagar liquidación');
+        console.error(error);
+    }
 }
 
 // ============================================================
@@ -392,6 +500,10 @@ async function crearPedido() {
     document.getElementById('clienteOrigen').value = '';
     document.getElementById('usuarioAsignado').value = '';
     await cargarPedidos();
+    // Recargar también los pedidos del usuario si está conectado
+    if (usuarioActual) {
+        await cargarPedidosUsuario(usuarioActual.id);
+    }
     alert('✅ Pedido creado');
 }
 
@@ -428,6 +540,10 @@ async function completarPedido(id) {
     await f.setLiquidacionAdmin(liquidacionAdmin);
     document.getElementById('totalAdmin').textContent = '$' + (liquidacionAdmin.total || 0);
     await cargarPedidos();
+    // Actualizar también el panel del usuario si está conectado
+    if (usuarioActual) {
+        await cargarPedidosUsuario(usuarioActual.id);
+    }
 }
 
 async function eliminarPedido(id) {
@@ -439,29 +555,29 @@ async function eliminarPedido(id) {
 }
 
 // ============================================================
-// ===== LIQUIDACIONES =====
+// ===== AJUSTAR LIQUIDACIÓN =====
 // ============================================================
-
-async function verLiquidacion(id) {
-    const u = usuariosCache.find(u => u.id === id);
-    if (!u) return;
-    alert(`💰 ${u.nombre}\nTotal: $${u.liquidacionTotal || 0}\nPedidos: ${u.pedidosCompletados || 0}`);
-}
 
 async function ajustarLiquidacion(id) {
     const u = usuariosCache.find(u => u.id === id);
     if (!u) return;
-    const concepto = prompt('Concepto:');
+    const concepto = prompt('Concepto (ej: Bono, Descuento, etc.):');
     if (!concepto) return;
-    const monto = parseFloat(prompt('Monto (+ o -):'));
+    const monto = parseFloat(prompt('Monto (positivo = extra, negativo = descuento):'));
     if (isNaN(monto) || monto === 0) return;
     const ajustes = u.ajustesLiquidacion || [];
-    ajustes.push({ id: Date.now(), fecha: new Date().toISOString(), concepto, monto });
+    ajustes.push({ 
+        id: Date.now(), 
+        fecha: new Date().toISOString(), 
+        concepto, 
+        monto,
+        tipo: monto > 0 ? 'extra' : 'descuento'
+    });
     const f = fb();
-    if (!f) return;
+    if (!f) { alert('Error de conexión'); return; }
     await f.setUsuario(id, { ...u, ajustesLiquidacion: ajustes, liquidacionTotal: (u.liquidacionTotal || 0) + monto });
     await cargarUsuarios();
-    alert('✅ Ajuste aplicado');
+    alert('✅ Ajuste aplicado correctamente');
 }
 
 // ============================================================
@@ -475,6 +591,9 @@ async function cargarPanelUsuario(usuario) {
     actualizarEstado(usuario);
     await cargarPedidosUsuario(usuario.id);
     iniciarEscucha();
+    
+    // Activar sonido después de cargar el panel
+    setTimeout(activarSonidoGlobal, 1000);
 }
 
 function getVehiculoIcon(v) {
@@ -515,6 +634,8 @@ async function cargarPedidosUsuario(usuarioId) {
     const f = fb();
     if (!f) return;
     const pedidos = await f.getPedidos();
+    // Actualizar cache global
+    pedidosCache = pedidos;
     renderPedidosUsuario(pedidos, usuarioId);
 }
 
@@ -529,7 +650,7 @@ function renderPedidosUsuario(pedidos, usuarioId) {
                     <p>📍 ${p.origen || 'Sin origen'} → ${p.destino || 'Sin destino'}</p>
                     <p>💰 Pago: $${p.pagoRepartidor || 0}</p>
                     <div class="card-actions">
-                        <button onclick="tomarPedido(${p.id})" class="btn-success">✅ Tomar</button>
+                        <button onclick="tomarPedido(${p.id})" class="btn-success">✅ Tomar Pedido</button>
                     </div>
                 </div>
             `).join('');
@@ -569,39 +690,81 @@ function renderPedidosUsuario(pedidos, usuarioId) {
 
 async function tomarPedido(id) {
     if (!usuarioActual || !usuarioActual.disponible) {
-        alert('No estás disponible');
+        alert('No estás disponible para tomar pedidos');
         return;
     }
     if (!confirm('¿Tomar este pedido?')) return;
+    
+    // Buscar el pedido en el cache actualizado
     const p = pedidosCache.find(p => p.id === id);
-    if (!p) return;
+    if (!p) {
+        alert('Error: Pedido no encontrado. Recargando...');
+        await cargarPedidosUsuario(usuarioActual.id);
+        return;
+    }
+    
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
-    await f.setPedido(id, { ...p, usuarioAsignado: usuarioActual.id, estado: 'asignado' });
-    await cargarPedidosUsuario(usuarioActual.id);
+    
+    try {
+        await f.setPedido(id, { ...p, usuarioAsignado: usuarioActual.id, estado: 'asignado' });
+        // Recargar pedidos del usuario
+        await cargarPedidosUsuario(usuarioActual.id);
+        // También actualizar el cache del admin si está logueado
+        if (document.getElementById('adminPanel').style.display !== 'none') {
+            await cargarPedidos();
+        }
+        alert('✅ Pedido tomado exitosamente');
+    } catch (error) {
+        alert('Error al tomar pedido');
+        console.error(error);
+    }
 }
 
 async function completarPedidoUsuario(id) {
     if (!confirm('¿Completar pedido?')) return;
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
-    const pedidos = await f.getPedidos();
-    const p = pedidos.find(p => p.id === id);
-    if (!p) { alert('Pedido no encontrado'); return; }
-    await f.setPedido(id, { ...p, estado: 'completado', fechaCompletado: new Date().toISOString() });
-    if (usuarioActual) {
-        const nuevoTotal = (usuarioActual.liquidacionTotal || 0) + p.pagoRepartidor;
-        await f.setUsuario(usuarioActual.id, { ...usuarioActual, liquidacionTotal: nuevoTotal, pedidosCompletados: (usuarioActual.pedidosCompletados || 0) + 1 });
-        usuarioActual.liquidacionTotal = nuevoTotal;
-        usuarioActual.pedidosCompletados = (usuarioActual.pedidosCompletados || 0) + 1;
-        document.getElementById('liquidacionUsuario').textContent = '$' + nuevoTotal;
-        guardarSesionUsuario(usuarioActual);
+    
+    try {
+        // Obtener pedido actualizado
+        const pedidos = await f.getPedidos();
+        const p = pedidos.find(p => p.id === id);
+        if (!p) { alert('Pedido no encontrado'); return; }
+        
+        await f.setPedido(id, { ...p, estado: 'completado', fechaCompletado: new Date().toISOString() });
+        
+        // Actualizar liquidación del usuario
+        if (usuarioActual) {
+            const nuevoTotal = (usuarioActual.liquidacionTotal || 0) + p.pagoRepartidor;
+            const nuevosPedidos = (usuarioActual.pedidosCompletados || 0) + 1;
+            await f.setUsuario(usuarioActual.id, { 
+                ...usuarioActual, 
+                liquidacionTotal: nuevoTotal, 
+                pedidosCompletados: nuevosPedidos 
+            });
+            usuarioActual.liquidacionTotal = nuevoTotal;
+            usuarioActual.pedidosCompletados = nuevosPedidos;
+            document.getElementById('liquidacionUsuario').textContent = '$' + nuevoTotal;
+            guardarSesionUsuario(usuarioActual);
+        }
+        
+        // Actualizar liquidación del admin
+        const ganancia = p.gananciaAdmin || p.costoServicio - p.pagoRepartidor;
+        liquidacionAdmin.total = (liquidacionAdmin.total || 0) + ganancia;
+        await f.setLiquidacionAdmin(liquidacionAdmin);
+        
+        // Recargar vistas
+        await cargarPedidosUsuario(usuarioActual.id);
+        if (document.getElementById('adminPanel').style.display !== 'none') {
+            await cargarPedidos();
+            await cargarUsuarios();
+        }
+        alert('✅ Pedido completado exitosamente');
+    } catch (error) {
+        alert('Error al completar pedido');
+        console.error(error);
     }
-    const ganancia = p.gananciaAdmin || p.costoServicio - p.pagoRepartidor;
-    liquidacionAdmin.total = (liquidacionAdmin.total || 0) + ganancia;
-    await f.setLiquidacionAdmin(liquidacionAdmin);
-    await cargarPedidosUsuario(usuarioActual.id);
-    alert('✅ Pedido completado');
 }
 
 // ============================================================
@@ -610,25 +773,35 @@ async function completarPedidoUsuario(id) {
 
 function iniciarEscucha() {
     const f = fb();
-    if (!f) { setTimeout(iniciarEscucha, 2000); return; }
-    console.log('📡 Escuchando pedidos...');
+    if (!f) { 
+        setTimeout(iniciarEscucha, 2000); 
+        return; 
+    }
+    console.log('📡 Escuchando pedidos en tiempo real...');
+    
     f.escucharNuevosPedidos(function(nuevo) {
         if (ultimoPedidoPendiente === null || nuevo.id !== ultimoPedidoPendiente.id) {
             ultimoPedidoPendiente = nuevo;
-            if (f.reproducirSonido) f.reproducirSonido();
+            
+            // Reproducir sonido con fuerza
+            if (f.reproducirSonido) {
+                f.reproducirSonido();
+                setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 300);
+                setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 600);
+            }
             
             // Alerta visual
             const alerta = document.createElement('div');
             alerta.className = 'alerta-pedido-nuevo';
-            alerta.style.cssText = 'background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:2px solid #28a745;border-radius:12px;padding:15px;margin-bottom:20px;';
+            alerta.style.cssText = 'background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:2px solid #28a745;border-radius:12px;padding:15px 20px;margin-bottom:20px;animation:fadeIn 0.5s ease-out;';
             alerta.innerHTML = `
                 <div style="display:flex;align-items:center;gap:15px;">
                     <span style="font-size:2.5rem;">📦</span>
                     <div style="flex:1;">
-                        <strong style="color:#28a745;">¡Nuevo Pedido!</strong>
-                        <p style="margin:3px 0;color:#b0b0b0;">${nuevo.descripcion}</p>
-                        <p style="font-size:0.9rem;color:#b0b0b0;">📍 ${nuevo.origen} → ${nuevo.destino}</p>
-                        <p style="color:#28a745;">💰 $${nuevo.pagoRepartidor}</p>
+                        <strong style="color:#28a745;font-size:1.1rem;">¡Nuevo Pedido!</strong>
+                        <p style="margin:3px 0;color:#b0b0b0;">${nuevo.descripcion || 'Sin descripción'}</p>
+                        <p style="font-size:0.9rem;color:#b0b0b0;margin:0;">📍 ${nuevo.origen || ''} → ${nuevo.destino || ''}</p>
+                        <p style="color:#28a745;margin:0;">💰 $${nuevo.pagoRepartidor || 0}</p>
                     </div>
                     <button onclick="this.parentElement.parentElement.remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;">✕</button>
                 </div>
@@ -637,17 +810,28 @@ function iniciarEscucha() {
             if (panel) panel.insertBefore(alerta, panel.firstChild);
             setTimeout(() => { if (alerta.parentNode) alerta.remove(); }, 15000);
             
-            if (usuarioActual) cargarPedidosUsuario(usuarioActual.id);
+            // Recargar pedidos
+            if (usuarioActual) {
+                cargarPedidosUsuario(usuarioActual.id);
+            }
         }
     });
 }
+
+// ============================================================
+// ===== ACTIVAR SONIDO MANUAL =====
+// ============================================================
 
 function activarSonidoManual() {
     const f = fb();
     if (f && f.activarSonido) {
         f.activarSonido();
-        if (f.reproducirSonido) f.reproducirSonido();
-        alert('🔊 Sonido activado');
+        if (f.reproducirSonido) {
+            f.reproducirSonido();
+            setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 300);
+            setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 600);
+        }
+        alert('🔊 Sonido activado correctamente');
     } else {
         alert('⚠️ Error al activar sonido');
     }
@@ -705,7 +889,7 @@ async function cargarLiquidaciones() {
             <p>📦 ${u.pedidosCompletados || 0}</p>
             <span class="badge ${u.activo ? 'badge-active' : 'badge-inactive'}">${u.activo ? '✅ Activo' : '❌ Inactivo'}</span>
             <div class="card-actions">
-                <button onclick="verLiquidacion(${u.id})" class="btn-primary">💰 Ver</button>
+                <button onclick="verLiquidacionDetalle(${u.id})" class="btn-primary">💰 Ver Detalle</button>
                 <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
             </div>
         </div>
@@ -731,7 +915,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Admin: LedZepp1');
     console.log('Usuarios: carlos123, maria456, julio789');
     
-    // Intentar activar sonido al cargar
+    // Activar sonido al cargar
     setTimeout(activarSonidoGlobal, 1000);
     
     if (typeof window.firebaseFunctions === 'undefined') {

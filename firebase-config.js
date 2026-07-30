@@ -16,98 +16,125 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
-// Mantener conexión activa
+// Mantener conexión activa SIEMPRE
 database.goOnline();
 
 // ============================================================
-// ✅ VERIFICAR CONEXIÓN
+// ✅ VERIFICAR CONEXIÓN CON RECONEXIÓN AUTOMÁTICA
 // ============================================================
 
 let reconectando = false;
+let intentosReconexion = 0;
 
 database.ref('.info/connected').on('value', function(snap) {
     if (snap.val() === true) {
         console.log('✅ Conectado a Firebase Realtime Database');
-        if (reconectando) {
-            reconectando = false;
-            if (window.usuarioActual) {
-                setTimeout(() => {
-                    if (window.cargarPedidosUsuario) {
-                        window.cargarPedidosUsuario(window.usuarioActual.id);
-                    }
-                }, 1000);
-            }
+        reconectando = false;
+        intentosReconexion = 0;
+        // Recargar datos automáticamente al reconectar
+        if (window.usuarioActual && window.cargarPedidosUsuario) {
+            setTimeout(() => {
+                window.cargarPedidosUsuario(window.usuarioActual.id);
+            }, 500);
         }
     } else {
         if (!reconectando) {
             reconectando = true;
             console.warn('⚠️ Desconectado de Firebase - Reintentando...');
-            setTimeout(() => {
+            // Intentar reconexión cada 3 segundos (más agresivo)
+            const interval = setInterval(() => {
+                if (!reconectando) {
+                    clearInterval(interval);
+                    return;
+                }
+                intentosReconexion++;
+                console.log(`🔄 Intento de reconexión #${intentosReconexion}`);
                 database.goOnline();
-            }, 5000);
+                if (intentosReconexion > 10) {
+                    clearInterval(interval);
+                    console.warn('⚠️ Reintentando reconexión en 30 segundos...');
+                    setTimeout(() => {
+                        intentosReconexion = 0;
+                        database.goOnline();
+                    }, 30000);
+                }
+            }, 3000);
         }
     }
 });
 
 // ============================================================
-// 🔊 SONIDO MEJORADO PARA MÓVILES
+// 🔊 SONIDO CON ARCHIVO MP3 (MÁS CONFIABLE)
 // ============================================================
 
-let audioContext = null;
+let audioElement = null;
 let sonidoHabilitado = true;
+let audioInicializado = false;
 
-function initAudio() {
+// Crear el elemento de audio una sola vez
+function initAudioElement() {
+    if (audioElement) return audioElement;
+    
     try {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
-        return true;
+        audioElement = new Audio('sonido.mp3');
+        // Precargar el audio
+        audioElement.preload = 'auto';
+        audioElement.load();
+        console.log('🔊 Archivo de sonido cargado: sonido.mp3');
+        return audioElement;
     } catch (e) {
-        console.warn('⚠️ Error con audio:', e);
-        return false;
+        console.warn('⚠️ Error cargando archivo de sonido:', e);
+        return null;
     }
 }
 
+// Activar audio con interacción del usuario
+function activarSonido() {
+    if (audioInicializado) return;
+    
+    try {
+        const audio = initAudioElement();
+        if (audio) {
+            // Reproducir un sonido de prueba muy corto para activar el contexto
+            audio.volume = 0.1;
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                audioInicializado = true;
+                console.log('🔊 Sonido activado por interacción del usuario');
+            }).catch(e => {
+                console.warn('⚠️ Error activando sonido:', e);
+            });
+        }
+    } catch (e) {
+        console.warn('⚠️ Error activando sonido:', e);
+    }
+}
+
+// Reproducir sonido de notificación
 function reproducirSonidoNotificacion() {
     if (!sonidoHabilitado) return;
     
     try {
-        if (!audioContext || audioContext.state === 'suspended') {
-            initAudio();
+        const audio = initAudioElement();
+        if (!audio) {
+            // Fallback: sonido generado por código
+            reproducirSonidoFallback();
+            return;
         }
         
-        if (!audioContext) return;
+        // Resetear el audio
+        audio.currentTime = 0;
+        audio.volume = 0.8;
         
-        // Sonido 1: Tono principal (880Hz)
-        const osc1 = audioContext.createOscillator();
-        const gain1 = audioContext.createGain();
-        osc1.connect(gain1);
-        gain1.connect(audioContext.destination);
-        osc1.type = 'sine';
-        osc1.frequency.value = 880;
-        gain1.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gain1.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
-        osc1.start(audioContext.currentTime);
-        osc1.stop(audioContext.currentTime + 0.2);
-        
-        // Sonido 2: Tono más agudo (1100Hz) - "ding dong"
-        setTimeout(() => {
-            try {
-                const osc2 = audioContext.createOscillator();
-                const gain2 = audioContext.createGain();
-                osc2.connect(gain2);
-                gain2.connect(audioContext.destination);
-                osc2.type = 'sine';
-                osc2.frequency.value = 1100;
-                gain2.gain.setValueAtTime(0.25, audioContext.currentTime);
-                gain2.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.25);
-                osc2.start(audioContext.currentTime);
-                osc2.stop(audioContext.currentTime + 0.25);
-            } catch (e) {}
-        }, 180);
+        // Reproducir
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(e => {
+                console.warn('⚠️ Error reproduciendo sonido MP3, usando fallback:', e);
+                reproducirSonidoFallback();
+            });
+        }
         
         // Vibración para móviles
         if (navigator.vibrate) {
@@ -115,60 +142,134 @@ function reproducirSonidoNotificacion() {
         }
         
     } catch (error) {
-        console.warn('⚠️ Error reproduciendo sonido:', error);
+        console.warn('⚠️ Error con sonido principal:', error);
+        reproducirSonidoFallback();
     }
 }
 
-function activarSonido() {
-    initAudio();
+// Sonido de fallback (por si no carga el MP3)
+function reproducirSonidoFallback() {
     try {
-        if (audioContext) {
-            const osc = audioContext.createOscillator();
-            const gain = audioContext.createGain();
-            osc.connect(gain);
-            gain.connect(audioContext.destination);
-            osc.frequency.value = 440;
-            gain.gain.setValueAtTime(0.1, audioContext.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.05);
-            osc.start(audioContext.currentTime);
-            osc.stop(audioContext.currentTime + 0.05);
+        // Crear audio context solo para fallback
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === 'suspended') {
+            ctx.resume();
         }
-    } catch (e) {}
+        
+        // Sonido 1: Tono principal
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.type = 'sine';
+        osc1.frequency.value = 880;
+        gain1.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+        osc1.start(ctx.currentTime);
+        osc1.stop(ctx.currentTime + 0.2);
+        
+        // Sonido 2
+        setTimeout(() => {
+            try {
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.type = 'sine';
+                osc2.frequency.value = 1100;
+                gain2.gain.setValueAtTime(0.25, ctx.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+                osc2.start(ctx.currentTime);
+                osc2.stop(ctx.currentTime + 0.25);
+            } catch (e) {}
+        }, 180);
+        
+    } catch (e) {
+        console.warn('⚠️ Fallback de sonido falló:', e);
+    }
 }
 
 // ============================================================
-// 📡 FUNCIONES DE FIREBASE
+// 📡 FUNCIONES DE FIREBASE - CON KEEP SYNCED
 // ============================================================
 
 function escucharNuevosPedidos(callback) {
     const pedidosRef = database.ref('pedidos');
+    
+    // MANTENER SINCRONIZADO - CLAVE PARA QUE FUNCIONE EN SEGUNDO PLANO
     pedidosRef.keepSynced(true);
     
+    // Escuchar nuevos pedidos añadidos
     pedidosRef.orderByChild('estado').equalTo('pendiente').on('child_added', function(snapshot) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
         if (pedido && pedido.estado === 'pendiente') {
+            console.log(`📦 Nuevo pedido #${id} detectado: ${pedido.descripcion}`);
+            // Reproducir sonido
             reproducirSonidoNotificacion();
+            // Mostrar notificación
             mostrarNotificacionNavegador('📦 Nuevo Pedido Disponible', 
                 `${pedido.descripcion}\n${pedido.origen} → ${pedido.destino}\n💰 $${pedido.pagoRepartidor}`);
             callback({ id, ...pedido });
         }
     });
     
+    // Escuchar cambios en pedidos existentes
     pedidosRef.on('child_changed', function(snapshot) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
         if (pedido && pedido.estado === 'pendiente') {
+            console.log(`📦 Pedido #${id} actualizado: ${pedido.descripcion}`);
             callback({ id, ...pedido });
         }
     });
+    
+    console.log('📡 Escuchando pedidos en tiempo real (keepSynced activado)');
 }
 
 function dejarDeEscucharNuevosPedidos() {
     database.ref('pedidos').off();
+    database.ref('pedidos').keepSynced(false);
 }
 
-// ===== USUARIOS =====
+// ============================================================
+// 📢 NOTIFICACIONES DEL NAVEGADOR
+// ============================================================
+
+function mostrarNotificacionNavegador(titulo, mensaje) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+            const notificacion = new Notification(titulo, {
+                body: mensaje,
+                icon: 'data:image/svg+xml,' + encodeURIComponent(`
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <rect width="100" height="100" rx="20" fill="#ff6b35"/>
+                        <text x="50" y="70" font-size="60" text-anchor="middle">📦</text>
+                    </svg>
+                `),
+                silent: false,
+                requireInteraction: true,
+                vibrate: [200, 100, 200],
+                tag: 'nuevo-pedido-' + Date.now()
+            });
+            
+            setTimeout(() => {
+                if (notificacion) notificacion.close();
+            }, 15000);
+            
+            return notificacion;
+        } catch (e) {
+            console.log('Error mostrando notificación:', e);
+        }
+    } else if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+// ============================================================
+// 📦 FUNCIONES CRUD
+// ============================================================
+
 async function getUsuarios() {
     try {
         const snapshot = await database.ref('usuarios').once('value');
@@ -204,7 +305,6 @@ async function deleteUsuario(id) {
     }
 }
 
-// ===== PEDIDOS =====
 async function getPedidos() {
     try {
         const snapshot = await database.ref('pedidos').once('value');
@@ -240,7 +340,6 @@ async function deletePedido(id) {
     }
 }
 
-// ===== CLIENTES =====
 async function getClientes() {
     try {
         const snapshot = await database.ref('clientes').once('value');
@@ -276,7 +375,6 @@ async function deleteCliente(id) {
     }
 }
 
-// ===== HISTORIAL LIQUIDACIONES =====
 async function getHistorialLiquidaciones() {
     try {
         const snapshot = await database.ref('historialLiquidaciones').once('value');
@@ -306,7 +404,6 @@ async function setHistorialLiquidaciones(historial) {
     }
 }
 
-// ===== LIQUIDACIÓN ADMIN =====
 async function getLiquidacionAdmin() {
     try {
         const snapshot = await database.ref('liquidacionAdmin').once('value');
@@ -329,7 +426,6 @@ async function setLiquidacionAdmin(data) {
     }
 }
 
-// ===== OBTENER PRÓXIMO ID =====
 async function getNextId(refPath) {
     try {
         const snapshot = await database.ref(refPath).once('value');
@@ -344,7 +440,6 @@ async function getNextId(refPath) {
     }
 }
 
-// ===== CREAR PEDIDO CON PUSHUP =====
 async function crearPedidoConPushup(pedidoData) {
     try {
         const id = await getNextId('pedidos');
@@ -359,38 +454,6 @@ async function crearPedidoConPushup(pedidoData) {
     } catch (error) {
         console.error('Error creando pedido:', error);
         throw error;
-    }
-}
-
-// ============================================================
-// 📢 NOTIFICACIONES DEL NAVEGADOR
-// ============================================================
-
-function mostrarNotificacionNavegador(titulo, mensaje) {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        try {
-            const notificacion = new Notification(titulo, {
-                body: mensaje,
-                icon: 'data:image/svg+xml,' + encodeURIComponent(`
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-                        <rect width="100" height="100" rx="20" fill="#ff6b35"/>
-                        <text x="50" y="70" font-size="60" text-anchor="middle">📦</text>
-                    </svg>
-                `),
-                silent: false,
-                requireInteraction: true,
-                vibrate: [200, 100, 200],
-                tag: 'nuevo-pedido-' + Date.now()
-            });
-            setTimeout(() => {
-                if (notificacion) notificacion.close();
-            }, 15000);
-            return notificacion;
-        } catch (e) {
-            console.log('Error mostrando notificación:', e);
-        }
-    } else if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
     }
 }
 
@@ -419,11 +482,11 @@ window.firebaseFunctions = {
     database,
     reproducirSonidoNotificacion,
     activarSonido,
-    initAudio,
+    initAudioElement,
     sonidoHabilitado
 };
 
 console.log('🔥 Firebase configurado correctamente');
-console.log('📡 Escuchando nuevos pedidos en tiempo real...');
+console.log('📡 Escuchando nuevos pedidos en tiempo real (keepSynced activado)');
 console.log('📦 Proyecto: santify-19aee');
-console.log('🔊 Sonido de notificaciones activado');
+console.log('🔊 Sonido: MP3 + Fallback');

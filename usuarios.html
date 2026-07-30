@@ -5,24 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Repartidor</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div class="container">
-        <!-- ========== LOGIN USUARIO ========== -->
+        <!-- ===== LOGIN USUARIO ===== -->
         <div id="loginUsuarioSection" class="section">
             <div class="login-box">
                 <h1>🚚 Panel de Repartidor</h1>
+                <p style="text-align:center; color:#888; margin-bottom:20px; font-size:0.9rem;">
+                    Toca la pantalla para activar el sonido 🔊
+                </p>
                 <input type="text" id="userLogin" placeholder="Usuario" class="input-field">
                 <input type="password" id="userPass" placeholder="Contraseña" class="input-field">
                 <button type="button" onclick="loginUsuario()" class="btn-primary">Ingresar</button>
                 <div id="userLoginError" class="error-message"></div>
+                <div style="text-align:center; margin-top:15px;">
+                    <button type="button" onclick="activarSonidoManual()" class="btn-success" style="padding:8px 16px; width:auto;">
+                        🔊 Activar Sonido
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- ========== PANEL USUARIO ========== -->
+        <!-- ===== PANEL USUARIO ===== -->
         <div id="usuarioPanel" class="section" style="display:none;">
             <div class="admin-header">
                 <h1 id="bienvenidaUsuario">👋 Hola, </h1>
@@ -45,6 +52,11 @@
                 <div class="status-item">
                     <label>Liquidación:</label>
                     <span id="liquidacionUsuario">$0</span>
+                </div>
+                <div class="status-item">
+                    <button type="button" onclick="activarSonidoManual()" class="btn-success" style="padding:8px 16px;">
+                        🔊 Sonido
+                    </button>
                 </div>
             </div>
 
@@ -71,9 +83,7 @@
         </div>
     </div>
 
-    <!-- Configuración de Firebase -->
     <script src="firebase-config.js"></script>
-    <!-- Lógica de la aplicación -->
     <script src="app.js"></script>
 </body>
 </html>

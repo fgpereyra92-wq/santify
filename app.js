@@ -1,5 +1,5 @@
 // ============================================================
-// ===== app.js - VERSIÓN CORREGIDA =====
+// ===== app.js - VERSIÓN COMPLETA CORREGIDA =====
 // ============================================================
 
 const ADMIN_PASSWORD = 'LedZepp1';
@@ -11,9 +11,10 @@ let historialLiquidaciones = [];
 let liquidacionAdmin = { total: 0, historial: [] };
 let ultimoPedidoPendiente = null;
 let notificacionSonidoHabilitada = true;
+let sonidoActivado = false;
 
 // ============================================================
-// ===== REFERENCIA A FIREBASE (Verificar que existe) =====
+// ===== REFERENCIA A FIREBASE =====
 // ============================================================
 
 function getFirebase() {
@@ -23,6 +24,29 @@ function getFirebase() {
     }
     return window.firebaseFunctions;
 }
+
+// ============================================================
+// ===== ACTIVAR SONIDO GLOBAL =====
+// ============================================================
+
+function activarSonidoGlobal() {
+    if (!sonidoActivado) {
+        const fb = getFirebase();
+        if (fb && fb.activarSonido) {
+            fb.activarSonido();
+            sonidoActivado = true;
+            console.log('🔊 Sonido activado por interacción del usuario');
+        }
+    }
+}
+
+// Detectar interacción del usuario para activar sonido
+document.addEventListener('click', function() {
+    activarSonidoGlobal();
+});
+document.addEventListener('touchstart', function() {
+    activarSonidoGlobal();
+});
 
 // ============================================================
 // ===== SESIÓN =====
@@ -94,6 +118,7 @@ async function loginUsuario() {
         
         if (usuario) {
             usuarioActual = usuario;
+            window.usuarioActual = usuario;
             guardarSesionUsuario(usuario);
             document.getElementById('loginUsuarioSection').style.display = 'none';
             document.getElementById('usuarioPanel').style.display = 'block';
@@ -109,6 +134,7 @@ async function loginUsuario() {
 
 function logoutUsuario() {
     usuarioActual = null;
+    window.usuarioActual = null;
     limpiarSesion();
     const fb = getFirebase();
     if (fb) fb.dejarDeEscucharNuevosPedidos();
@@ -150,7 +176,6 @@ async function cargarPedidos() {
         pedidosCache = await fb.getPedidos();
         renderPedidosAdmin(pedidosCache);
         
-        // Cargar usuarios en select
         const selectUsuario = document.getElementById('usuarioAsignado');
         if (selectUsuario) {
             const usuariosActivos = usuariosCache.filter(u => u.activo);
@@ -169,7 +194,6 @@ async function cargarClientes() {
         clientesCache = await fb.getClientes();
         renderClientes(clientesCache);
         
-        // Cargar clientes en select de origen
         const selectCliente = document.getElementById('clienteOrigen');
         if (selectCliente) {
             const clientesActivos = clientesCache.filter(c => c.activo);
@@ -187,7 +211,6 @@ async function cargarHistorialLiquidaciones() {
         if (!fb) return;
         historialLiquidaciones = await fb.getHistorialLiquidaciones();
     } catch (error) {
-        console.error('Error cargando historial:', error);
         historialLiquidaciones = [];
     }
 }
@@ -202,7 +225,6 @@ async function cargarLiquidacionAdmin() {
             totalAdmin.textContent = `$${liquidacionAdmin.total || 0}`;
         }
     } catch (error) {
-        console.error('Error cargando liquidacionAdmin:', error);
         liquidacionAdmin = { total: 0, historial: [] };
     }
 }
@@ -445,7 +467,6 @@ async function crearPedido() {
     const pagoRepartidor = parseFloat(document.getElementById('pagoRepartidor').value);
     const usuarioAsignado = document.getElementById('usuarioAsignado').value;
     
-    // Validar origen
     let origen = '';
     if (clienteId) {
         const cliente = clientesCache.find(c => c.id === parseInt(clienteId));
@@ -633,6 +654,7 @@ async function toggleDisponibilidad() {
     if (!fb) { alert('Error de conexión con Firebase'); return; }
     await fb.setUsuario(usuarioActual.id, { ...usuarioActual, disponible: nuevoEstado });
     usuarioActual.disponible = nuevoEstado;
+    window.usuarioActual = usuarioActual;
     guardarSesionUsuario(usuarioActual);
     actualizarEstadoUsuario(usuarioActual);
     await cargarPedidosUsuario(usuarioActual.id);
@@ -729,6 +751,7 @@ async function completarPedidoUsuario(id) {
         });
         usuarioActual.liquidacionTotal = nuevaLiquidacion;
         usuarioActual.pedidosCompletados = (usuarioActual.pedidosCompletados || 0) + 1;
+        window.usuarioActual = usuarioActual;
         const liquidacionSpan = document.getElementById('liquidacionUsuario');
         if (liquidacionSpan) liquidacionSpan.textContent = `$${nuevaLiquidacion}`;
         guardarSesionUsuario(usuarioActual);
@@ -741,8 +764,45 @@ async function completarPedidoUsuario(id) {
 }
 
 // ============================================================
-// ===== PUSHUP - NOTIFICACIONES =====
+// ===== PUSHUP - NOTIFICACIONES MEJORADAS =====
 // ============================================================
+
+function mostrarAlertaPedidoNuevoMejorado(pedido) {
+    const fb = getFirebase();
+    if (fb && fb.reproducirSonidoNotificacion) {
+        fb.reproducirSonidoNotificacion();
+        setTimeout(() => {
+            if (fb.reproducirSonidoNotificacion) fb.reproducirSonidoNotificacion();
+        }, 300);
+    }
+    
+    const alertaAnterior = document.querySelector('.alerta-pedido-nuevo');
+    if (alertaAnterior) alertaAnterior.remove();
+    
+    const alerta = document.createElement('div');
+    alerta.className = 'alerta-pedido-nuevo';
+    alerta.innerHTML = `
+        <div class="alerta-contenido">
+            <span class="alerta-icono">📦</span>
+            <div class="alerta-texto">
+                <strong>¡Nuevo Pedido Disponible!</strong>
+                <p>${pedido.descripcion || 'Sin descripción'}</p>
+                <p style="font-size: 0.9rem; opacity: 0.8;">📍 ${pedido.origen || 'Sin origen'} → ${pedido.destino || 'Sin destino'}</p>
+                <p style="font-size: 0.9rem; color: #28a745;">💰 $${pedido.pagoRepartidor || 0}</p>
+            </div>
+            <button onclick="this.closest('.alerta-pedido-nuevo').remove()" class="btn-danger" style="padding: 4px 12px;">✕</button>
+        </div>
+    `;
+    
+    const panel = document.getElementById('usuarioPanel');
+    if (panel) {
+        panel.insertBefore(alerta, panel.firstChild);
+    }
+    
+    setTimeout(() => {
+        if (alerta.parentNode) alerta.remove();
+    }, 15000);
+}
 
 function iniciarEscuchaPushup() {
     const fb = getFirebase();
@@ -751,52 +811,59 @@ function iniciarEscuchaPushup() {
         return;
     }
     
+    activarSonidoGlobal();
+    
     fb.escucharNuevosPedidos(function(nuevoPedido) {
         if (ultimoPedidoPendiente === null || nuevoPedido.id !== ultimoPedidoPendiente.id) {
             ultimoPedidoPendiente = nuevoPedido;
             
-            // Sonido
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.frequency.value = 880;
-                gain.gain.value = 0.3;
-                osc.start();
-                setTimeout(() => { osc.stop(); }, 150);
-            } catch(e) { console.log('Error con sonido:', e); }
+            if (fb.reproducirSonidoNotificacion) {
+                fb.reproducirSonidoNotificacion();
+                setTimeout(() => {
+                    if (fb.reproducirSonidoNotificacion) fb.reproducirSonidoNotificacion();
+                }, 300);
+            }
             
-            // Notificación
             if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('📦 Nuevo Pedido Disponible', {
-                    body: `${nuevoPedido.descripcion}\n${nuevoPedido.origen} → ${nuevoPedido.destino}\n💰 $${nuevoPedido.pagoRepartidor}`,
-                    silent: false
+                    body: `${nuevoPedido.descripcion || 'Pedido'}\n📍 ${nuevoPedido.origen || ''} → ${nuevoPedido.destino || ''}\n💰 $${nuevoPedido.pagoRepartidor || 0}`,
+                    icon: 'data:image/svg+xml,' + encodeURIComponent(`
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                            <rect width="100" height="100" rx="20" fill="#ff6b35"/>
+                            <text x="50" y="70" font-size="60" text-anchor="middle">📦</text>
+                        </svg>
+                    `),
+                    silent: false,
+                    vibrate: [200, 100, 200],
+                    requireInteraction: true
                 });
             }
             
-            // Alerta visual
-            const alerta = document.createElement('div');
-            alerta.className = 'alerta-pedido-nuevo';
-            alerta.innerHTML = `
-                <div class="alerta-contenido">
-                    <span class="alerta-icono">📦</span>
-                    <div class="alerta-texto">
-                        <strong>¡Nuevo Pedido Disponible!</strong>
-                        <p>${nuevoPedido.descripcion}</p>
-                        <p>${nuevoPedido.origen} → ${nuevoPedido.destino}</p>
-                        <p>💰 $${nuevoPedido.pagoRepartidor}</p>
-                    </div>
-                    <button onclick="this.parentElement.parentElement.remove()" class="btn-danger">✕</button>
-                </div>
-            `;
-            const panel = document.getElementById('usuarioPanel');
-            if (panel) panel.insertBefore(alerta, panel.firstChild);
-            setTimeout(() => { if (alerta.parentNode) alerta.remove(); }, 10000);
-            cargarPedidosUsuario(usuarioActual.id);
+            mostrarAlertaPedidoNuevoMejorado(nuevoPedido);
+            
+            if (usuarioActual) {
+                cargarPedidosUsuario(usuarioActual.id);
+            }
         }
     });
+}
+
+// ============================================================
+// ===== ACTIVAR SONIDO MANUAL =====
+// ============================================================
+
+function activarSonidoManual() {
+    const fb = getFirebase();
+    if (fb && fb.initAudio) {
+        fb.initAudio();
+        if (fb.reproducirSonidoNotificacion) {
+            fb.reproducirSonidoNotificacion();
+            setTimeout(() => {
+                if (fb.reproducirSonidoNotificacion) fb.reproducirSonidoNotificacion();
+            }, 300);
+        }
+        alert('🔊 Sonido activado. Ahora escucharás las notificaciones.');
+    }
 }
 
 // ============================================================
@@ -925,8 +992,8 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🚚 Gestor de Entregas v3.0 - Firebase');
     console.log('Admin: LedZepp1');
     console.log('Usuarios: carlos123 / reparto2024, maria456 / bici2024');
+    console.log('🔊 Sonido: Activado al tocar la pantalla');
     
-    // Esperar a que Firebase esté listo
     if (typeof window.firebaseFunctions === 'undefined') {
         console.warn('⏳ Esperando carga de Firebase...');
         const checkFirebase = setInterval(function() {
@@ -950,6 +1017,7 @@ function iniciarSistema() {
     const usuario = obtenerSesionUsuario();
     if (usuario) {
         usuarioActual = usuario;
+        window.usuarioActual = usuario;
         document.getElementById('loginUsuarioSection').style.display = 'none';
         document.getElementById('usuarioPanel').style.display = 'block';
         cargarPanelUsuario(usuario);

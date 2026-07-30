@@ -16,23 +16,130 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
+// Mantener conexión activa
+database.goOnline();
+
 // ============================================================
 // ✅ VERIFICAR CONEXIÓN
 // ============================================================
 
+let reconectando = false;
+
 database.ref('.info/connected').on('value', function(snap) {
     if (snap.val() === true) {
         console.log('✅ Conectado a Firebase Realtime Database');
+        if (reconectando) {
+            reconectando = false;
+            if (window.usuarioActual) {
+                setTimeout(() => {
+                    if (window.cargarPedidosUsuario) {
+                        window.cargarPedidosUsuario(window.usuarioActual.id);
+                    }
+                }, 1000);
+            }
+        }
     } else {
-        console.warn('⚠️ Desconectado de Firebase - Reintentando...');
+        if (!reconectando) {
+            reconectando = true;
+            console.warn('⚠️ Desconectado de Firebase - Reintentando...');
+            setTimeout(() => {
+                database.goOnline();
+            }, 5000);
+        }
     }
 });
+
+// ============================================================
+// 🔊 SONIDO MEJORADO PARA MÓVILES
+// ============================================================
+
+let audioContext = null;
+let sonidoHabilitado = true;
+
+function initAudio() {
+    try {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        return true;
+    } catch (e) {
+        console.warn('⚠️ Error con audio:', e);
+        return false;
+    }
+}
+
+function reproducirSonidoNotificacion() {
+    if (!sonidoHabilitado) return;
+    
+    try {
+        if (!audioContext || audioContext.state === 'suspended') {
+            initAudio();
+        }
+        
+        if (!audioContext) return;
+        
+        // Sonido 1: Tono principal (880Hz)
+        const osc1 = audioContext.createOscillator();
+        const gain1 = audioContext.createGain();
+        osc1.connect(gain1);
+        gain1.connect(audioContext.destination);
+        osc1.type = 'sine';
+        osc1.frequency.value = 880;
+        gain1.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.2);
+        osc1.start(audioContext.currentTime);
+        osc1.stop(audioContext.currentTime + 0.2);
+        
+        // Sonido 2: Tono más agudo (1100Hz) - "ding dong"
+        setTimeout(() => {
+            try {
+                const osc2 = audioContext.createOscillator();
+                const gain2 = audioContext.createGain();
+                osc2.connect(gain2);
+                gain2.connect(audioContext.destination);
+                osc2.type = 'sine';
+                osc2.frequency.value = 1100;
+                gain2.gain.setValueAtTime(0.25, audioContext.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.25);
+                osc2.start(audioContext.currentTime);
+                osc2.stop(audioContext.currentTime + 0.25);
+            } catch (e) {}
+        }, 180);
+        
+        // Vibración para móviles
+        if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100, 50, 200]);
+        }
+        
+    } catch (error) {
+        console.warn('⚠️ Error reproduciendo sonido:', error);
+    }
+}
+
+function activarSonido() {
+    initAudio();
+    try {
+        if (audioContext) {
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+            osc.frequency.value = 440;
+            gain.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.05);
+            osc.start(audioContext.currentTime);
+            osc.stop(audioContext.currentTime + 0.05);
+        }
+    } catch (e) {}
+}
 
 // ============================================================
 // 📡 FUNCIONES DE FIREBASE
 // ============================================================
 
-// Escuchar nuevos pedidos
 function escucharNuevosPedidos(callback) {
     const pedidosRef = database.ref('pedidos');
     pedidosRef.keepSynced(true);
@@ -41,6 +148,9 @@ function escucharNuevosPedidos(callback) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
         if (pedido && pedido.estado === 'pendiente') {
+            reproducirSonidoNotificacion();
+            mostrarNotificacionNavegador('📦 Nuevo Pedido Disponible', 
+                `${pedido.descripcion}\n${pedido.origen} → ${pedido.destino}\n💰 $${pedido.pagoRepartidor}`);
             callback({ id, ...pedido });
         }
     });
@@ -253,6 +363,38 @@ async function crearPedidoConPushup(pedidoData) {
 }
 
 // ============================================================
+// 📢 NOTIFICACIONES DEL NAVEGADOR
+// ============================================================
+
+function mostrarNotificacionNavegador(titulo, mensaje) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+            const notificacion = new Notification(titulo, {
+                body: mensaje,
+                icon: 'data:image/svg+xml,' + encodeURIComponent(`
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                        <rect width="100" height="100" rx="20" fill="#ff6b35"/>
+                        <text x="50" y="70" font-size="60" text-anchor="middle">📦</text>
+                    </svg>
+                `),
+                silent: false,
+                requireInteraction: true,
+                vibrate: [200, 100, 200],
+                tag: 'nuevo-pedido-' + Date.now()
+            });
+            setTimeout(() => {
+                if (notificacion) notificacion.close();
+            }, 15000);
+            return notificacion;
+        } catch (e) {
+            console.log('Error mostrando notificación:', e);
+        }
+    } else if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+}
+
+// ============================================================
 // 📢 EXPORTAR FUNCIONES
 // ============================================================
 
@@ -274,9 +416,14 @@ window.firebaseFunctions = {
     setLiquidacionAdmin,
     getNextId,
     crearPedidoConPushup,
-    database
+    database,
+    reproducirSonidoNotificacion,
+    activarSonido,
+    initAudio,
+    sonidoHabilitado
 };
 
 console.log('🔥 Firebase configurado correctamente');
 console.log('📡 Escuchando nuevos pedidos en tiempo real...');
 console.log('📦 Proyecto: santify-19aee');
+console.log('🔊 Sonido de notificaciones activado');

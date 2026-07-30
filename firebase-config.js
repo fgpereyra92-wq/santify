@@ -23,8 +23,11 @@ database.goOnline();
 // ✅ MONITOREO DE CONEXIÓN
 // ============================================================
 
+let isConnected = false;
+
 database.ref('.info/connected').on('value', function(snap) {
-    if (snap.val() === true) {
+    isConnected = snap.val() === true;
+    if (isConnected) {
         console.log('✅ Conectado a Firebase');
     } else {
         console.warn('⚠️ Desconectado de Firebase');
@@ -37,7 +40,7 @@ database.ref('.info/connected').on('value', function(snap) {
 
 let audioElement = null;
 let audioContext = null;
-let sonidoHabilitado = false; // ← CLAVE: solo se activa con acción del usuario
+let sonidoHabilitado = false;
 
 // Crear o reanudar AudioContext SOLO si el usuario ya interactuó
 function prepararAudio() {
@@ -59,7 +62,7 @@ function prepararAudio() {
     }
 }
 
-// Cargar el archivo de sonido (solo si es necesario)
+// Cargar el archivo de sonido
 function obtenerAudio() {
     if (audioElement) return audioElement;
     try {
@@ -82,7 +85,7 @@ function reproducirSonido() {
     }
 
     try {
-        // Opción 1: AudioContext (tono sintético)
+        // Opción 1: AudioContext (tono sintético como respaldo)
         if (audioContext && audioContext.state === 'running') {
             const osc = audioContext.createOscillator();
             const gain = audioContext.createGain();
@@ -133,8 +136,8 @@ function activarSonidoManual() {
     const ok = prepararAudio();
     if (ok) {
         // Reproducir sonido de prueba para confirmar
-        reproducirSonido();
-        setTimeout(reproducirSonido, 300);
+        setTimeout(() => reproducirSonido(), 100);
+        setTimeout(() => reproducirSonido(), 400);
         alert('🔊 Sonido activado correctamente');
     } else {
         alert('⚠️ No se pudo activar el sonido. Intenta nuevamente.');
@@ -145,31 +148,47 @@ function activarSonidoManual() {
 // 📡 FUNCIONES DE FIREBASE (CORREGIDAS)
 // ============================================================
 
+let listenerActivo = null;
+
 function escucharNuevosPedidos(callback) {
+    // ❌ ELIMINADO: pedidosRef.keepSynced(true); - NO EXISTE en Firebase v9+
+    // En su lugar, Firebase mantiene los datos sincronizados automáticamente
+    
     const pedidosRef = database.ref('pedidos');
 
-    // ✅ CORRECCIÓN: keepSynced se aplica a la referencia, no al resultado de orderByChild
-    pedidosRef.keepSynced(true);
-
-    pedidosRef.orderByChild('estado').equalTo('pendiente').on('child_added', function(snapshot) {
+    // CORRECCIÓN: Escuchar todos los pedidos nuevos sin filtrar por estado
+    // El filtro lo haremos en el callback
+    listenerActivo = pedidosRef.on('child_added', function(snapshot) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
+        
         if (pedido && pedido.estado === 'pendiente') {
             console.log('📦 Nuevo pedido #' + id + ': ' + pedido.descripcion);
-            // Reproducir sonido varias veces para asegurar
-            reproducirSonido();
-            setTimeout(reproducirSonido, 300);
-            setTimeout(reproducirSonido, 600);
+            
+            // Solo reproducir sonido si está habilitado
+            if (sonidoHabilitado) {
+                reproducirSonido();
+                // Reintentos para asegurar que se reproduzca
+                setTimeout(() => reproducirSonido(), 300);
+                setTimeout(() => reproducirSonido(), 600);
+            }
+            
+            // Llamar al callback con el pedido
             callback({ id, ...pedido });
         }
+    }, function(error) {
+        console.error('❌ Error escuchando pedidos:', error);
     });
 
-    console.log('📡 Escuchando pedidos en tiempo real (keepSynced activado)');
+    console.log('📡 Escuchando pedidos en tiempo real');
 }
 
 function dejarDeEscuchar() {
-    database.ref('pedidos').off();
-    database.ref('pedidos').keepSynced(false);
+    if (listenerActivo) {
+        database.ref('pedidos').off('child_added', listenerActivo);
+        listenerActivo = null;
+        console.log('🔇 Dejó de escuchar pedidos');
+    }
 }
 
 // ============================================================

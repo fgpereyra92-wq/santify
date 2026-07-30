@@ -41,7 +41,7 @@ database.ref('.info/connected').on('value', function(snap) {
         if (!reconectando) {
             reconectando = true;
             console.warn('⚠️ Desconectado de Firebase - Reintentando...');
-            // Intentar reconexión cada 3 segundos (más agresivo)
+            // Intentar reconexión cada 3 segundos
             const interval = setInterval(() => {
                 if (!reconectando) {
                     clearInterval(interval);
@@ -64,20 +64,18 @@ database.ref('.info/connected').on('value', function(snap) {
 });
 
 // ============================================================
-// 🔊 SONIDO CON ARCHIVO MP3 (MÁS CONFIABLE)
+// 🔊 SONIDO CON ARCHIVO MP3
 // ============================================================
 
 let audioElement = null;
 let sonidoHabilitado = true;
 let audioInicializado = false;
 
-// Crear el elemento de audio una sola vez
 function initAudioElement() {
     if (audioElement) return audioElement;
     
     try {
         audioElement = new Audio('sonido.mp3');
-        // Precargar el audio
         audioElement.preload = 'auto';
         audioElement.load();
         console.log('🔊 Archivo de sonido cargado: sonido.mp3');
@@ -88,14 +86,12 @@ function initAudioElement() {
     }
 }
 
-// Activar audio con interacción del usuario
 function activarSonido() {
     if (audioInicializado) return;
     
     try {
         const audio = initAudioElement();
         if (audio) {
-            // Reproducir un sonido de prueba muy corto para activar el contexto
             audio.volume = 0.1;
             audio.play().then(() => {
                 audio.pause();
@@ -111,23 +107,19 @@ function activarSonido() {
     }
 }
 
-// Reproducir sonido de notificación
 function reproducirSonidoNotificacion() {
     if (!sonidoHabilitado) return;
     
     try {
         const audio = initAudioElement();
         if (!audio) {
-            // Fallback: sonido generado por código
             reproducirSonidoFallback();
             return;
         }
         
-        // Resetear el audio
         audio.currentTime = 0;
         audio.volume = 0.8;
         
-        // Reproducir
         const playPromise = audio.play();
         if (playPromise !== undefined) {
             playPromise.catch(e => {
@@ -136,7 +128,6 @@ function reproducirSonidoNotificacion() {
             });
         }
         
-        // Vibración para móviles
         if (navigator.vibrate) {
             navigator.vibrate([100, 50, 100, 50, 200]);
         }
@@ -147,16 +138,13 @@ function reproducirSonidoNotificacion() {
     }
 }
 
-// Sonido de fallback (por si no carga el MP3)
 function reproducirSonidoFallback() {
     try {
-        // Crear audio context solo para fallback
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (ctx.state === 'suspended') {
             ctx.resume();
         }
         
-        // Sonido 1: Tono principal
         const osc1 = ctx.createOscillator();
         const gain1 = ctx.createGain();
         osc1.connect(gain1);
@@ -168,7 +156,6 @@ function reproducirSonidoFallback() {
         osc1.start(ctx.currentTime);
         osc1.stop(ctx.currentTime + 0.2);
         
-        // Sonido 2
         setTimeout(() => {
             try {
                 const osc2 = ctx.createOscillator();
@@ -188,53 +175,6 @@ function reproducirSonidoFallback() {
         console.warn('⚠️ Fallback de sonido falló:', e);
     }
 }
-
-// ============================================================
-// 📡 FUNCIONES DE FIREBASE - CON KEEP SYNCED
-// ============================================================
-
-function escucharNuevosPedidos(callback) {
-    const pedidosRef = database.ref('pedidos');
-    
-    // MANTENER SINCRONIZADO - CLAVE PARA QUE FUNCIONE EN SEGUNDO PLANO
-    pedidosRef.keepSynced(true);
-    
-    // Escuchar nuevos pedidos añadidos
-    pedidosRef.orderByChild('estado').equalTo('pendiente').on('child_added', function(snapshot) {
-        const pedido = snapshot.val();
-        const id = parseInt(snapshot.key);
-        if (pedido && pedido.estado === 'pendiente') {
-            console.log(`📦 Nuevo pedido #${id} detectado: ${pedido.descripcion}`);
-            // Reproducir sonido
-            reproducirSonidoNotificacion();
-            // Mostrar notificación
-            mostrarNotificacionNavegador('📦 Nuevo Pedido Disponible', 
-                `${pedido.descripcion}\n${pedido.origen} → ${pedido.destino}\n💰 $${pedido.pagoRepartidor}`);
-            callback({ id, ...pedido });
-        }
-    });
-    
-    // Escuchar cambios en pedidos existentes
-    pedidosRef.on('child_changed', function(snapshot) {
-        const pedido = snapshot.val();
-        const id = parseInt(snapshot.key);
-        if (pedido && pedido.estado === 'pendiente') {
-            console.log(`📦 Pedido #${id} actualizado: ${pedido.descripcion}`);
-            callback({ id, ...pedido });
-        }
-    });
-    
-    console.log('📡 Escuchando pedidos en tiempo real (keepSynced activado)');
-}
-
-function dejarDeEscucharNuevosPedidos() {
-    database.ref('pedidos').off();
-    database.ref('pedidos').keepSynced(false);
-}
-
-// ============================================================
-// 📢 NOTIFICACIONES DEL NAVEGADOR
-// ============================================================
 
 function mostrarNotificacionNavegador(titulo, mensaje) {
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -264,6 +204,43 @@ function mostrarNotificacionNavegador(titulo, mensaje) {
     } else if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
+}
+
+// ============================================================
+// 📡 FUNCIONES DE FIREBASE - CON KEEP SYNCED
+// ============================================================
+
+function escucharNuevosPedidos(callback) {
+    const pedidosRef = database.ref('pedidos');
+    pedidosRef.keepSynced(true);
+    
+    pedidosRef.orderByChild('estado').equalTo('pendiente').on('child_added', function(snapshot) {
+        const pedido = snapshot.val();
+        const id = parseInt(snapshot.key);
+        if (pedido && pedido.estado === 'pendiente') {
+            console.log(`📦 Nuevo pedido #${id} detectado: ${pedido.descripcion}`);
+            reproducirSonidoNotificacion();
+            mostrarNotificacionNavegador('📦 Nuevo Pedido Disponible', 
+                `${pedido.descripcion}\n${pedido.origen} → ${pedido.destino}\n💰 $${pedido.pagoRepartidor}`);
+            callback({ id, ...pedido });
+        }
+    });
+    
+    pedidosRef.on('child_changed', function(snapshot) {
+        const pedido = snapshot.val();
+        const id = parseInt(snapshot.key);
+        if (pedido && pedido.estado === 'pendiente') {
+            console.log(`📦 Pedido #${id} actualizado: ${pedido.descripcion}`);
+            callback({ id, ...pedido });
+        }
+    });
+    
+    console.log('📡 Escuchando pedidos en tiempo real (keepSynced activado)');
+}
+
+function dejarDeEscucharNuevosPedidos() {
+    database.ref('pedidos').off();
+    database.ref('pedidos').keepSynced(false);
 }
 
 // ============================================================
@@ -483,7 +460,20 @@ window.firebaseFunctions = {
     reproducirSonidoNotificacion,
     activarSonido,
     initAudioElement,
-    sonidoHabilitado
+    sonidoHabilitado,
+    mostrarNotificacionNavegador
+};
+
+// ============================================================
+// 🔥 FUNCIÓN GLOBAL PARA ACCEDER A FIREBASE DESDE APP.JS
+// ============================================================
+
+window.getFirebase = function() {
+    if (typeof window.firebaseFunctions === 'undefined') {
+        console.error('❌ Firebase no está cargado');
+        return null;
+    }
+    return window.firebaseFunctions;
 };
 
 console.log('🔥 Firebase configurado correctamente');

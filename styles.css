@@ -450,38 +450,7 @@ body {
 
 /* ===== ALERTA DE NUEVO PEDIDO ===== */
 .alerta-pedido-nuevo {
-    background: linear-gradient(135deg, #1a3a1a, #0a2a0a);
-    border: 2px solid #28a745;
-    border-radius: 12px;
-    padding: 15px 20px;
-    margin-bottom: 20px;
     animation: alertaEntrada 0.5s ease-out;
-    box-shadow: 0 0 30px rgba(40, 167, 69, 0.2);
-}
-
-.alerta-contenido {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.alerta-icono {
-    font-size: 2.5rem;
-    animation: iconoPulso 0.8s ease-in-out infinite;
-}
-
-.alerta-texto {
-    flex: 1;
-}
-
-.alerta-texto strong {
-    color: #28a745;
-    font-size: 1.2rem;
-}
-
-.alerta-texto p {
-    margin: 3px 0;
-    color: #b0b0b0;
 }
 
 @keyframes alertaEntrada {
@@ -502,10 +471,6 @@ body {
     50% {
         transform: scale(1.2);
     }
-}
-
-.btn-toggle-sonido {
-    min-width: 120px;
 }
 
 /* ===== RESPONSIVE ===== */
@@ -546,28 +511,4 @@ body {
     .liquidacion-actions button {
         width: 100%;
     }
-}
-/* ===== ANIMACIONES PARA NOTIFICACIONES ===== */
-@keyframes alertaEntrada {
-    from {
-        opacity: 0;
-        transform: translateX(-20px) scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0) scale(1);
-    }
-}
-
-@keyframes iconoPulso {
-    0%, 100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.2);
-    }
-}
-
-.alerta-pedido-nuevo {
-    animation: alertaEntrada 0.5s ease-out;
 }

@@ -38,20 +38,22 @@ function activarSonidoGlobal() {
         if (ok) {
             sonidoActivadoPorUsuario = true;
             console.log('🔊 Sonido activado por interacción');
-            if (f.reproducirSonido) {
-                f.reproducirSonido();
-                setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 300);
-            }
         }
     }
 }
 
 // Eventos que activan el sonido (solo si el usuario interactúa)
-document.addEventListener('click', function() {
-    activarSonidoGlobal();
+document.addEventListener('click', function(e) {
+    // Solo activar si no es un botón de "Activar Sonido" (ese tiene su propia lógica)
+    if (!e.target.closest('[onclick*="activarSonido"]')) {
+        activarSonidoGlobal();
+    }
 });
-document.addEventListener('touchstart', function() {
-    activarSonidoGlobal();
+
+document.addEventListener('touchstart', function(e) {
+    if (!e.target.closest('[onclick*="activarSonido"]')) {
+        activarSonidoGlobal();
+    }
 });
 
 // ============================================================
@@ -727,7 +729,6 @@ function renderPedidosUsuario(pedidos, usuarioId) {
 // ============================================================
 
 async function tomarPedido(id) {
-    // ✅ VALIDACIÓN: Usuario logueado y disponible
     if (!usuarioActual) {
         alert('Debes iniciar sesión');
         return;
@@ -738,7 +739,6 @@ async function tomarPedido(id) {
     }
     if (!confirm('¿Tomar este pedido?')) return;
 
-    // ✅ VALIDACIÓN: Buscar pedido en caché
     const p = pedidosCache.find(p => p.id === id);
     if (!p) {
         alert('Error: Pedido no encontrado. Recargando...');
@@ -753,7 +753,6 @@ async function tomarPedido(id) {
         await f.setPedido(id, { ...p, usuarioAsignado: usuarioActual.id, estado: 'asignado' });
         await cargarPedidosUsuario(usuarioActual.id);
         
-        // ✅ ACTUALIZAR también el panel de admin si está visible
         const adminPanel = document.getElementById('adminPanel');
         if (adminPanel && adminPanel.style.display !== 'none') {
             await cargarPedidos();
@@ -778,7 +777,6 @@ async function completarPedidoUsuario(id) {
 
         await f.setPedido(id, { ...p, estado: 'completado', fechaCompletado: new Date().toISOString() });
 
-        // Actualizar liquidación del usuario
         if (usuarioActual) {
             const nuevoTotal = (usuarioActual.liquidacionTotal || 0) + p.pagoRepartidor;
             const nuevosPedidos = (usuarioActual.pedidosCompletados || 0) + 1;
@@ -795,7 +793,6 @@ async function completarPedidoUsuario(id) {
             guardarSesionUsuario(usuarioActual);
         }
 
-        // Actualizar liquidación del admin
         const ganancia = p.gananciaAdmin || p.costoServicio - p.pagoRepartidor;
         liquidacionAdmin.total = (liquidacionAdmin.total || 0) + ganancia;
         await f.setLiquidacionAdmin(liquidacionAdmin);
@@ -821,23 +818,20 @@ async function completarPedidoUsuario(id) {
 function iniciarEscucha() {
     const f = fb();
     if (!f) {
+        console.warn('⚠️ Firebase no disponible, reintentando en 2 segundos...');
         setTimeout(iniciarEscucha, 2000);
         return;
     }
+    
     console.log('📡 Escuchando pedidos en tiempo real...');
-
+    
     f.escucharNuevosPedidos(function(nuevo) {
+        console.log('📦 Nuevo pedido recibido:', nuevo);
+        
         if (ultimoPedidoPendiente === null || nuevo.id !== ultimoPedidoPendiente.id) {
             ultimoPedidoPendiente = nuevo;
 
-            // Reproducir sonido (solo si está habilitado)
-            if (f.reproducirSonido) {
-                f.reproducirSonido();
-                setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 300);
-                setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 600);
-            }
-
-            // Alerta visual
+            // Mostrar alerta visual
             const alerta = document.createElement('div');
             alerta.className = 'alerta-pedido-nuevo';
             alerta.style.cssText = 'background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:2px solid #28a745;border-radius:12px;padding:15px 20px;margin-bottom:20px;animation:fadeIn 0.5s ease-out;';
@@ -853,10 +847,14 @@ function iniciarEscucha() {
                     <button onclick="this.parentElement.parentElement.remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;">✕</button>
                 </div>
             `;
+            
             const panel = document.getElementById('usuarioPanel');
-            if (panel) panel.insertBefore(alerta, panel.firstChild);
-            setTimeout(() => { if (alerta.parentNode) alerta.remove(); }, 15000);
+            if (panel) {
+                panel.insertBefore(alerta, panel.firstChild);
+                setTimeout(() => { if (alerta.parentNode) alerta.remove(); }, 15000);
+            }
 
+            // Actualizar lista de pedidos
             if (usuarioActual) {
                 cargarPedidosUsuario(usuarioActual.id);
             }
@@ -965,8 +963,6 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Admin: LedZepp1');
     console.log('Usuarios: carlos123, maria456, julio789');
     console.log('🔊 Para activar el sonido, toca el botón "Activar Sonido" o la pantalla');
-
-    // ✅ NO se activa sonido automáticamente — solo con interacción del usuario
 
     if (typeof window.firebaseFunctions === 'undefined') {
         const check = setInterval(function() {

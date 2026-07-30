@@ -44,7 +44,6 @@ function activarSonidoGlobal() {
 
 // Eventos que activan el sonido (solo si el usuario interactúa)
 document.addEventListener('click', function(e) {
-    // Solo activar si no es un botón de "Activar Sonido" (ese tiene su propia lógica)
     if (!e.target.closest('[onclick*="activarSonido"]')) {
         activarSonidoGlobal();
     }
@@ -319,45 +318,179 @@ async function verLiquidacionDetalle(id) {
     const pedidos = await f.getPedidos();
     const pedidosCompletados = pedidos.filter(p => p.usuarioAsignado === id && p.estado === 'completado');
     
+    // Calcular totales
+    const totalPedidos = pedidosCompletados.reduce((sum, p) => sum + (p.pagoRepartidor || 0), 0);
+    const ajustes = u.ajustesLiquidacion || [];
+    const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
+    const totalGeneral = totalPedidos + totalAjustes;
+    
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;z-index:1000;padding:20px;';
     
     modal.innerHTML = `
-        <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;padding:25px;">
+        <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;padding:25px;">
             <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a2a;padding-bottom:15px;margin-bottom:20px;">
-                <h2 style="color:#ff6b35;margin:0;">💰 ${u.nombre}</h2>
+                <h2 style="color:#ff6b35;margin:0;">💰 Liquidación: ${u.nombre}</h2>
                 <button onclick="this.closest('.modal-overlay').remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">✕</button>
             </div>
+            
+            <!-- Resumen -->
             <div style="background:#2a2a2a;padding:15px;border-radius:8px;margin-bottom:20px;">
-                <p><strong>Total a pagar:</strong> $${u.liquidacionTotal || 0}</p>
-                <p><strong>Pedidos completados:</strong> ${u.pedidosCompletados || 0}</p>
+                <p><strong>Repartidor:</strong> ${u.nombre}</p>
                 <p><strong>Vehículo:</strong> ${u.vehiculo}</p>
+                <p><strong>Total pedidos:</strong> $${totalPedidos}</p>
+                ${totalAjustes !== 0 ? `<p><strong>Ajustes:</strong> $${totalAjustes}</p>` : ''}
+                <p style="font-size:1.2rem;"><strong>TOTAL A PAGAR:</strong> <span style="color:#28a745;font-size:1.5rem;">$${totalGeneral}</span></p>
             </div>
             
-            <h4 style="color:#ff6b35;margin-bottom:10px;">📦 Pedidos completados</h4>
-            <div style="max-height:200px;overflow-y:auto;">
-                ${pedidosCompletados.length === 0 ? '<p style="color:#888;">No hay pedidos completados</p>' :
-                    pedidosCompletados.map(p => `
-                        <div style="background:#2a2a2a;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #28a745;">
-                            <p style="margin:3px 0;">${p.descripcion}</p>
-                            <p style="margin:3px 0;font-size:0.9rem;color:#b0b0b0;">📍 ${p.origen} → ${p.destino}</p>
-                            <p style="margin:3px 0;color:#28a745;">💰 $${p.pagoRepartidor}</p>
+            <!-- Pedidos completados -->
+            <h4 style="color:#ff6b35;margin-bottom:10px;">📦 Pedidos Completados (${pedidosCompletados.length})</h4>
+            ${pedidosCompletados.length === 0 ? '<p style="color:#888;">No hay pedidos completados</p>' : `
+                <div style="max-height:250px;overflow-y:auto;margin-bottom:20px;">
+                    <table style="width:100%;border-collapse:collapse;color:#b0b0b0;">
+                        <thead>
+                            <tr style="border-bottom:2px solid #2a2a2a;text-align:left;">
+                                <th style="padding:8px;">#</th>
+                                <th style="padding:8px;">Descripción</th>
+                                <th style="padding:8px;">Origen → Destino</th>
+                                <th style="padding:8px;">Pago</th>
+                                <th style="padding:8px;">Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${pedidosCompletados.map((p, i) => `
+                                <tr style="border-bottom:1px solid #2a2a2a;">
+                                    <td style="padding:8px;">${i + 1}</td>
+                                    <td style="padding:8px;">${p.descripcion}</td>
+                                    <td style="padding:8px;font-size:0.85rem;">📍 ${p.origen} → ${p.destino}</td>
+                                    <td style="padding:8px;color:#28a745;">$${p.pagoRepartidor}</td>
+                                    <td style="padding:8px;font-size:0.8rem;">${p.fechaCompletado ? new Date(p.fechaCompletado).toLocaleDateString() : 'N/A'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+            
+            <!-- Ajustes -->
+            ${ajustes.length > 0 ? `
+                <h4 style="color:#ff6b35;margin-bottom:10px;">✏️ Ajustes</h4>
+                <div style="max-height:150px;overflow-y:auto;margin-bottom:20px;">
+                    ${ajustes.map(a => `
+                        <div style="background:#2a2a2a;padding:10px;border-radius:6px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <p style="margin:0;">${a.concepto}</p>
+                                <p style="margin:0;font-size:0.8rem;color:#888;">${new Date(a.fecha).toLocaleDateString()}</p>
+                            </div>
+                            <span style="color:${a.monto > 0 ? '#28a745' : '#dc3545'};font-weight:bold;">
+                                ${a.monto > 0 ? '+' : ''}$${a.monto}
+                            </span>
                         </div>
                     `).join('')}
-            </div>
+                </div>
+            ` : ''}
             
-            <div style="display:flex;gap:10px;margin-top:20px;">
-                <button onclick="pagarLiquidacion(${u.id})" style="flex:1;padding:12px;background:#28a745;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">
+            <!-- Botones de acción -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button onclick="compartirLiquidacionWhatsApp(${u.id})" style="flex:1;min-width:150px;padding:12px;background:#25D366;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">
+                    📱 Compartir por WhatsApp
+                </button>
+                <button onclick="copiarReporteLiquidacion(${u.id})" style="flex:1;min-width:150px;padding:12px;background:#007bff;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">
+                    📋 Copiar Reporte
+                </button>
+                <button onclick="pagarLiquidacion(${u.id})" style="flex:1;min-width:150px;padding:12px;background:#28a745;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">
                     ✅ Pagar Liquidación
                 </button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex:1;padding:12px;background:#6c757d;color:white;border:none;border-radius:6px;cursor:pointer;">
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex:1;min-width:150px;padding:12px;background:#6c757d;color:white;border:none;border-radius:6px;cursor:pointer;">
                     Cerrar
                 </button>
             </div>
         </div>
     `;
     document.body.appendChild(modal);
+}
+
+// ============================================================
+// ===== COMPARTIR REPORTE DE LIQUIDACIÓN =====
+// ============================================================
+
+function generarReporteTexto(usuarioId) {
+    const u = usuariosCache.find(u => u.id === usuarioId);
+    if (!u) return '';
+    
+    const pedidosCompletados = pedidosCache.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'completado');
+    const totalPedidos = pedidosCompletados.reduce((sum, p) => sum + (p.pagoRepartidor || 0), 0);
+    const ajustes = u.ajustesLiquidacion || [];
+    const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
+    const totalGeneral = totalPedidos + totalAjustes;
+    
+    let reporte = `📊 *LIQUIDACIÓN - ${u.nombre}*\n`;
+    reporte += `🚗 Vehículo: ${u.vehiculo}\n`;
+    reporte += `📅 Fecha: ${new Date().toLocaleDateString()}\n\n`;
+    
+    reporte += `📦 *PEDIDOS COMPLETADOS (${pedidosCompletados.length})*\n`;
+    pedidosCompletados.forEach((p, i) => {
+        reporte += `${i + 1}. ${p.descripcion}\n`;
+        reporte += `   📍 ${p.origen} → ${p.destino}\n`;
+        reporte += `   💰 $${p.pagoRepartidor}\n`;
+        if (p.fechaCompletado) {
+            reporte += `   📅 ${new Date(p.fechaCompletado).toLocaleDateString()}\n`;
+        }
+        reporte += '\n';
+    });
+    
+    reporte += `💰 Subtotal pedidos: $${totalPedidos}\n`;
+    
+    if (ajustes.length > 0) {
+        reporte += `\n✏️ *AJUSTES*\n`;
+        ajustes.forEach(a => {
+            reporte += `• ${a.concepto}: ${a.monto > 0 ? '+' : ''}$${a.monto}\n`;
+        });
+        reporte += `💰 Total ajustes: $${totalAjustes}\n`;
+    }
+    
+    reporte += `\n💵 *TOTAL A PAGAR: $${totalGeneral}*\n`;
+    reporte += `\n✅ Liquidación generada por Gestor de Entregas`;
+    
+    return reporte;
+}
+
+function copiarReporteLiquidacion(usuarioId) {
+    const reporte = generarReporteTexto(usuarioId);
+    
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(reporte).then(() => {
+            alert('✅ Reporte copiado al portapapeles\n\nPuedes pegarlo en WhatsApp o donde necesites.');
+        }).catch(() => {
+            copiarTextoFallback(reporte);
+        });
+    } else {
+        copiarTextoFallback(reporte);
+    }
+}
+
+function copiarTextoFallback(texto) {
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        alert('✅ Reporte copiado al portapapeles');
+    } catch (err) {
+        alert('No se pudo copiar automáticamente. Aquí está el reporte:\n\n' + texto);
+    }
+    document.body.removeChild(textarea);
+}
+
+function compartirLiquidacionWhatsApp(usuarioId) {
+    const reporte = generarReporteTexto(usuarioId);
+    const mensaje = encodeURIComponent(reporte);
+    const url = `https://wa.me/?text=${mensaje}`;
+    window.open(url, '_blank');
 }
 
 async function pagarLiquidacion(id) {
@@ -752,11 +885,6 @@ async function tomarPedido(id) {
     try {
         await f.setPedido(id, { ...p, usuarioAsignado: usuarioActual.id, estado: 'asignado' });
         await cargarPedidosUsuario(usuarioActual.id);
-        
-        const adminPanel = document.getElementById('adminPanel');
-        if (adminPanel && adminPanel.style.display !== 'none') {
-            await cargarPedidos();
-        }
         alert('✅ Pedido tomado exitosamente');
     } catch (error) {
         console.error('Error al tomar pedido:', error);
@@ -798,12 +926,6 @@ async function completarPedidoUsuario(id) {
         await f.setLiquidacionAdmin(liquidacionAdmin);
 
         await cargarPedidosUsuario(usuarioActual.id);
-
-        const adminPanel = document.getElementById('adminPanel');
-        if (adminPanel && adminPanel.style.display !== 'none') {
-            await cargarPedidos();
-            await cargarUsuarios();
-        }
         alert('✅ Pedido completado exitosamente');
     } catch (error) {
         console.error('Error al completar pedido:', error);
@@ -812,7 +934,7 @@ async function completarPedidoUsuario(id) {
 }
 
 // ============================================================
-// ===== NOTIFICACIONES EN TIEMPO REAL =====
+// ===== NOTIFICACIONES EN TIEMPO REAL (ACTUALIZADO) =====
 // ============================================================
 
 function iniciarEscucha() {
@@ -826,36 +948,49 @@ function iniciarEscucha() {
     console.log('📡 Escuchando pedidos en tiempo real...');
     
     f.escucharNuevosPedidos(function(nuevo) {
-        console.log('📦 Nuevo pedido recibido:', nuevo);
+        console.log('📦 Nuevo pedido o cambio detectado:', nuevo);
         
-        if (ultimoPedidoPendiente === null || nuevo.id !== ultimoPedidoPendiente.id) {
+        if (ultimoPedidoPendiente === null || nuevo.id !== ultimoPedidoPendiente?.id || nuevo.estado !== ultimoPedidoPendiente?.estado) {
             ultimoPedidoPendiente = nuevo;
 
-            // Mostrar alerta visual
-            const alerta = document.createElement('div');
-            alerta.className = 'alerta-pedido-nuevo';
-            alerta.style.cssText = 'background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:2px solid #28a745;border-radius:12px;padding:15px 20px;margin-bottom:20px;animation:fadeIn 0.5s ease-out;';
-            alerta.innerHTML = `
-                <div style="display:flex;align-items:center;gap:15px;">
-                    <span style="font-size:2.5rem;">📦</span>
-                    <div style="flex:1;">
-                        <strong style="color:#28a745;font-size:1.1rem;">¡Nuevo Pedido!</strong>
-                        <p style="margin:3px 0;color:#b0b0b0;">${nuevo.descripcion || 'Sin descripción'}</p>
-                        <p style="font-size:0.9rem;color:#b0b0b0;margin:0;">📍 ${nuevo.origen || ''} → ${nuevo.destino || ''}</p>
-                        <p style="color:#28a745;margin:0;">💰 $${nuevo.pagoRepartidor || 0}</p>
-                    </div>
-                    <button onclick="this.parentElement.parentElement.remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;">✕</button>
-                </div>
-            `;
-            
-            const panel = document.getElementById('usuarioPanel');
-            if (panel) {
-                panel.insertBefore(alerta, panel.firstChild);
-                setTimeout(() => { if (alerta.parentNode) alerta.remove(); }, 15000);
+            // Si es un pedido nuevo (pendiente), mostrar alerta
+            if (nuevo.estado === 'pendiente') {
+                // Mostrar alerta visual SOLO para repartidores
+                if (usuarioActual) {
+                    const alerta = document.createElement('div');
+                    alerta.className = 'alerta-pedido-nuevo';
+                    alerta.style.cssText = 'background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:2px solid #28a745;border-radius:12px;padding:15px 20px;margin-bottom:20px;animation:fadeIn 0.5s ease-out;';
+                    alerta.innerHTML = `
+                        <div style="display:flex;align-items:center;gap:15px;">
+                            <span style="font-size:2.5rem;">📦</span>
+                            <div style="flex:1;">
+                                <strong style="color:#28a745;font-size:1.1rem;">¡Nuevo Pedido!</strong>
+                                <p style="margin:3px 0;color:#b0b0b0;">${nuevo.descripcion || 'Sin descripción'}</p>
+                                <p style="font-size:0.9rem;color:#b0b0b0;margin:0;">📍 ${nuevo.origen || ''} → ${nuevo.destino || ''}</p>
+                                <p style="color:#28a745;margin:0;">💰 $${nuevo.pagoRepartidor || 0}</p>
+                            </div>
+                            <button onclick="this.parentElement.parentElement.remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;">✕</button>
+                        </div>
+                    `;
+                    
+                    const panel = document.getElementById('usuarioPanel');
+                    if (panel) {
+                        panel.insertBefore(alerta, panel.firstChild);
+                        setTimeout(() => { if (alerta.parentNode) alerta.remove(); }, 15000);
+                    }
+                }
             }
 
-            // Actualizar lista de pedidos
+            // ✅ ACTUALIZAR panel de admin automáticamente si está visible
+            const adminPanel = document.getElementById('adminPanel');
+            if (adminPanel && adminPanel.style.display !== 'none') {
+                console.log('🔄 Actualizando panel admin automáticamente...');
+                cargarPedidos();
+            }
+
+            // ✅ ACTUALIZAR panel de usuario automáticamente
             if (usuarioActual) {
+                console.log('🔄 Actualizando panel de usuario automáticamente...');
                 cargarPedidosUsuario(usuarioActual.id);
             }
         }

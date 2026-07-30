@@ -151,24 +151,19 @@ function activarSonidoManual() {
 let listenerActivo = null;
 
 function escucharNuevosPedidos(callback) {
-    // ❌ ELIMINADO: pedidosRef.keepSynced(true); - NO EXISTE en Firebase v9+
-    // En su lugar, Firebase mantiene los datos sincronizados automáticamente
-    
     const pedidosRef = database.ref('pedidos');
 
-    // CORRECCIÓN: Escuchar todos los pedidos nuevos sin filtrar por estado
-    // El filtro lo haremos en el callback
-    listenerActivo = pedidosRef.on('child_added', function(snapshot) {
+    // Escuchar NUEVOS pedidos (child_added)
+    pedidosRef.on('child_added', function(snapshot) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
         
-        if (pedido && pedido.estado === 'pendiente') {
-            console.log('📦 Nuevo pedido #' + id + ': ' + pedido.descripcion);
+        if (pedido) {
+            console.log('📦 Pedido detectado #' + id + ': ' + pedido.descripcion + ' [' + pedido.estado + ']');
             
-            // Solo reproducir sonido si está habilitado
-            if (sonidoHabilitado) {
+            // Solo reproducir sonido si es un pedido nuevo pendiente y el sonido está habilitado
+            if (pedido.estado === 'pendiente' && sonidoHabilitado) {
                 reproducirSonido();
-                // Reintentos para asegurar que se reproduzca
                 setTimeout(() => reproducirSonido(), 300);
                 setTimeout(() => reproducirSonido(), 600);
             }
@@ -180,15 +175,23 @@ function escucharNuevosPedidos(callback) {
         console.error('❌ Error escuchando pedidos:', error);
     });
 
-    console.log('📡 Escuchando pedidos en tiempo real');
+    // También escuchar CAMBIOS en pedidos existentes (para actualizar estado en tiempo real)
+    pedidosRef.on('child_changed', function(snapshot) {
+        const pedido = snapshot.val();
+        const id = parseInt(snapshot.key);
+        
+        if (pedido) {
+            console.log('🔄 Pedido actualizado #' + id + ': ' + pedido.descripcion + ' [' + pedido.estado + ']');
+            callback({ id, ...pedido });
+        }
+    });
+
+    console.log('📡 Escuchando pedidos en tiempo real (nuevos y cambios)');
 }
 
 function dejarDeEscuchar() {
-    if (listenerActivo) {
-        database.ref('pedidos').off('child_added', listenerActivo);
-        listenerActivo = null;
-        console.log('🔇 Dejó de escuchar pedidos');
-    }
+    database.ref('pedidos').off();
+    console.log('🔇 Dejó de escuchar pedidos');
 }
 
 // ============================================================

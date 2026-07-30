@@ -1,8 +1,6 @@
 // ============================================================
 // 🔥 CONFIGURACIÓN DE FIREBASE
 // ============================================================
-// ¡CAMBIAR ESTOS DATOS CON LOS TUYOS!
-// Los obtienes de: Firebase Console → Configuración del proyecto → Tus aplicaciones
 
 const firebaseConfig = {
     apiKey: "AIzaSyAeGBlBuHu_sm1_yq-3RCwsNZMEAXmunxE",
@@ -19,8 +17,9 @@ firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 
 // ============================================================
-// ✅ VERIFICAR CONEXIÓN CON FIREBASE
+// ✅ VERIFICAR CONEXIÓN
 // ============================================================
+
 database.ref('.info/connected').on('value', function(snap) {
     if (snap.val() === true) {
         console.log('✅ Conectado a Firebase Realtime Database');
@@ -30,37 +29,22 @@ database.ref('.info/connected').on('value', function(snap) {
 });
 
 // ============================================================
-// 📡 FUNCIONES DE FIREBASE CON PUSHUP PARA NUEVOS PEDIDOS
+// 📡 FUNCIONES DE FIREBASE
 // ============================================================
 
-// Función para escuchar nuevos pedidos en tiempo real (PUSHUP)
+// Escuchar nuevos pedidos
 function escucharNuevosPedidos(callback) {
     const pedidosRef = database.ref('pedidos');
-    
-    // Usar keepSynced para mantener la conexión activa
     pedidosRef.keepSynced(true);
     
     pedidosRef.orderByChild('estado').equalTo('pendiente').on('child_added', function(snapshot) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
         if (pedido && pedido.estado === 'pendiente') {
-            // Enviar notificación push
-            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({
-                    type: 'PUSH',
-                    data: {
-                        title: '📦 Nuevo Pedido',
-                        body: `${pedido.descripcion}\n${pedido.origen} → ${pedido.destino}\n💰 $${pedido.pagoRepartidor}`,
-                        url: '/usuarios.html'
-                    }
-                });
-            }
             callback({ id, ...pedido });
         }
     });
-}
     
-    // También escuchar cambios en pedidos existentes (para actualizaciones)
     pedidosRef.on('child_changed', function(snapshot) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
@@ -70,16 +54,11 @@ function escucharNuevosPedidos(callback) {
     });
 }
 
-// Función para dejar de escuchar
 function dejarDeEscucharNuevosPedidos() {
     database.ref('pedidos').off();
 }
 
-// ============================================================
-// 📦 FUNCIONES CRUD PARA FIREBASE
-// ============================================================
-
-// Leer todos los usuarios
+// ===== USUARIOS =====
 async function getUsuarios() {
     try {
         const snapshot = await database.ref('usuarios').once('value');
@@ -91,11 +70,10 @@ async function getUsuarios() {
         }));
     } catch (error) {
         console.error('Error obteniendo usuarios:', error);
-        throw error;
+        return [];
     }
 }
 
-// Guardar/Actualizar usuario
 async function setUsuario(id, usuarioData) {
     try {
         await database.ref(`usuarios/${id}`).set(usuarioData);
@@ -106,7 +84,6 @@ async function setUsuario(id, usuarioData) {
     }
 }
 
-// Eliminar usuario
 async function deleteUsuario(id) {
     try {
         await database.ref(`usuarios/${id}`).remove();
@@ -117,7 +94,7 @@ async function deleteUsuario(id) {
     }
 }
 
-// Leer todos los pedidos
+// ===== PEDIDOS =====
 async function getPedidos() {
     try {
         const snapshot = await database.ref('pedidos').once('value');
@@ -129,11 +106,10 @@ async function getPedidos() {
         }));
     } catch (error) {
         console.error('Error obteniendo pedidos:', error);
-        throw error;
+        return [];
     }
 }
 
-// Guardar/Actualizar pedido
 async function setPedido(id, pedidoData) {
     try {
         await database.ref(`pedidos/${id}`).set(pedidoData);
@@ -144,7 +120,6 @@ async function setPedido(id, pedidoData) {
     }
 }
 
-// Eliminar pedido
 async function deletePedido(id) {
     try {
         await database.ref(`pedidos/${id}`).remove();
@@ -155,7 +130,43 @@ async function deletePedido(id) {
     }
 }
 
-// Leer historial de liquidaciones
+// ===== CLIENTES =====
+async function getClientes() {
+    try {
+        const snapshot = await database.ref('clientes').once('value');
+        const data = snapshot.val();
+        if (!data) return [];
+        return Object.keys(data).map(key => ({
+            id: parseInt(key),
+            ...data[key]
+        }));
+    } catch (error) {
+        console.error('Error obteniendo clientes:', error);
+        return [];
+    }
+}
+
+async function setCliente(id, clienteData) {
+    try {
+        await database.ref(`clientes/${id}`).set(clienteData);
+        return { id, ...clienteData };
+    } catch (error) {
+        console.error('Error guardando cliente:', error);
+        throw error;
+    }
+}
+
+async function deleteCliente(id) {
+    try {
+        await database.ref(`clientes/${id}`).remove();
+        return true;
+    } catch (error) {
+        console.error('Error eliminando cliente:', error);
+        throw error;
+    }
+}
+
+// ===== HISTORIAL LIQUIDACIONES =====
 async function getHistorialLiquidaciones() {
     try {
         const snapshot = await database.ref('historialLiquidaciones').once('value');
@@ -171,7 +182,6 @@ async function getHistorialLiquidaciones() {
     }
 }
 
-// Guardar historial de liquidaciones
 async function setHistorialLiquidaciones(historial) {
     try {
         const obj = {};
@@ -186,7 +196,7 @@ async function setHistorialLiquidaciones(historial) {
     }
 }
 
-// Leer liquidación del admin
+// ===== LIQUIDACIÓN ADMIN =====
 async function getLiquidacionAdmin() {
     try {
         const snapshot = await database.ref('liquidacionAdmin').once('value');
@@ -199,7 +209,6 @@ async function getLiquidacionAdmin() {
     }
 }
 
-// Guardar liquidación del admin
 async function setLiquidacionAdmin(data) {
     try {
         await database.ref('liquidacionAdmin').set(data);
@@ -210,7 +219,7 @@ async function setLiquidacionAdmin(data) {
     }
 }
 
-// Obtener próximo ID disponible
+// ===== OBTENER PRÓXIMO ID =====
 async function getNextId(refPath) {
     try {
         const snapshot = await database.ref(refPath).once('value');
@@ -225,10 +234,7 @@ async function getNextId(refPath) {
     }
 }
 
-// ============================================================
-// 🚀 FUNCIÓN PARA CREAR PEDIDO CON PUSHUP
-// ============================================================
-
+// ===== CREAR PEDIDO CON PUSHUP =====
 async function crearPedidoConPushup(pedidoData) {
     try {
         const id = await getNextId('pedidos');
@@ -238,10 +244,7 @@ async function crearPedidoConPushup(pedidoData) {
             fechaCompletado: null
         };
         await setPedido(id, nuevoPedido);
-        
-        // Esto activará automáticamente el 'child_added' y notificará a todos los usuarios conectados
         console.log(`📦 Nuevo pedido #${id} creado - Notificando a repartidores...`);
-        
         return { id, ...nuevoPedido };
     } catch (error) {
         console.error('Error creando pedido:', error);
@@ -250,10 +253,9 @@ async function crearPedidoConPushup(pedidoData) {
 }
 
 // ============================================================
-// 📢 EXPORTAR FUNCIONES PARA USO EN app.js
+// 📢 EXPORTAR FUNCIONES
 // ============================================================
 
-// Hacer las funciones globales para app.js
 window.firebaseFunctions = {
     escucharNuevosPedidos,
     dejarDeEscucharNuevosPedidos,
@@ -263,6 +265,9 @@ window.firebaseFunctions = {
     getPedidos,
     setPedido,
     deletePedido,
+    getClientes,
+    setCliente,
+    deleteCliente,
     getHistorialLiquidaciones,
     setHistorialLiquidaciones,
     getLiquidacionAdmin,
@@ -272,34 +277,6 @@ window.firebaseFunctions = {
     database
 };
 
-// ============================================================
-// 🔥 INICIALIZACIÓN
-// ============================================================
 console.log('🔥 Firebase configurado correctamente');
 console.log('📡 Escuchando nuevos pedidos en tiempo real...');
 console.log('📦 Proyecto: santify-19aee');
-console.log('🌐 Database URL:', firebaseConfig.databaseURL);
-// ============================================================
-// ===== REGISTRAR SERVICE WORKER =====
-// ============================================================
-
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-        .then(reg => {
-            console.log('✅ Service Worker registrado');
-            // Solicitar permiso para notificaciones push
-            if ('PushManager' in window) {
-                reg.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: 'TU_VAPID_KEY'
-                }).then(subscription => {
-                    console.log('✅ Suscrito a notificaciones push');
-                }).catch(err => {
-                    console.log('❌ Error en suscripción push:', err);
-                });
-            }
-        })
-        .catch(err => {
-            console.log('❌ Error registrando Service Worker:', err);
-        });
-}

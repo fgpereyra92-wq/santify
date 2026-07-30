@@ -1,5 +1,5 @@
 // ============================================================
-// ===== app.js - VERSIÓN CORREGIDA =====
+// ===== app.js — VERSIÓN ESTABLE Y PROFESIONAL =====
 // ============================================================
 
 const ADMIN_PASSWORD = 'LedZepp1';
@@ -12,39 +12,46 @@ let liquidacionAdmin = { total: 0, historial: [] };
 let ultimoPedidoPendiente = null;
 
 // ============================================================
-// ===== FIREBASE HELPER =====
+// ===== HELPER PARA FIREBASE =====
 // ============================================================
 
 function fb() {
-    if (typeof window.firebaseFunctions === 'undefined') {
+    const f = window.firebaseFunctions;
+    if (!f) {
         console.error('❌ Firebase no cargado');
         return null;
     }
-    return window.firebaseFunctions;
+    return f;
 }
 
 // ============================================================
-// ===== ACTIVAR SONIDO GLOBAL =====
+// ===== ACTIVAR SONIDO POR INTERACCIÓN =====
 // ============================================================
 
-let sonidoActivado = false;
+let sonidoActivadoPorUsuario = false;
 
 function activarSonidoGlobal() {
-    if (sonidoActivado) return;
+    if (sonidoActivadoPorUsuario) return;
     const f = fb();
-    if (f && f.activarSonido) {
-        f.activarSonido();
-        sonidoActivado = true;
-        console.log('🔊 Sonido activado globalmente');
+    if (f && f.prepararAudio) {
+        const ok = f.prepararAudio();
+        if (ok) {
+            sonidoActivadoPorUsuario = true;
+            console.log('🔊 Sonido activado por interacción');
+            if (f.reproducirSonido) {
+                f.reproducirSonido();
+                setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 300);
+            }
+        }
     }
 }
 
-// Activar sonido con cualquier interacción del usuario
-document.addEventListener('click', function() { 
-    activarSonidoGlobal(); 
+// Eventos que activan el sonido (solo si el usuario interactúa)
+document.addEventListener('click', function() {
+    activarSonidoGlobal();
 });
-document.addEventListener('touchstart', function() { 
-    activarSonidoGlobal(); 
+document.addEventListener('touchstart', function() {
+    activarSonidoGlobal();
 });
 
 // ============================================================
@@ -65,13 +72,17 @@ function loginAdmin() {
     const pass = document.getElementById('adminPassword').value;
     if (pass === ADMIN_PASSWORD) {
         guardarSesionAdmin(true);
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('adminPanel').style.display = 'block';
+        const loginSection = document.getElementById('loginSection');
+        const adminPanel = document.getElementById('adminPanel');
+        if (loginSection) loginSection.style.display = 'none';
+        if (adminPanel) adminPanel.style.display = 'block';
         cargarDatosAdmin();
         document.getElementById('adminPassword').value = '';
-        document.getElementById('loginError').textContent = '';
+        const errorEl = document.getElementById('loginError');
+        if (errorEl) errorEl.textContent = '';
     } else {
-        document.getElementById('loginError').textContent = '❌ Clave incorrecta';
+        const errorEl = document.getElementById('loginError');
+        if (errorEl) errorEl.textContent = '❌ Clave incorrecta';
     }
 }
 
@@ -80,8 +91,10 @@ function logout() {
     limpiarSesion();
     const f = fb();
     if (f) f.dejarDeEscuchar();
-    document.getElementById('loginSection').style.display = 'block';
-    document.getElementById('adminPanel').style.display = 'none';
+    const loginSection = document.getElementById('loginSection');
+    const adminPanel = document.getElementById('adminPanel');
+    if (loginSection) loginSection.style.display = 'block';
+    if (adminPanel) adminPanel.style.display = 'none';
 }
 
 // ============================================================
@@ -91,10 +104,14 @@ function logout() {
 async function loginUsuario() {
     const username = document.getElementById('userLogin').value;
     const password = document.getElementById('userPass').value;
+    const errorEl = document.getElementById('userLoginError');
     
     try {
         const f = fb();
-        if (!f) { document.getElementById('userLoginError').textContent = '❌ Error de conexión'; return; }
+        if (!f) {
+            if (errorEl) errorEl.textContent = '❌ Error de conexión';
+            return;
+        }
         
         const usuarios = await f.getUsuarios();
         const usuario = usuarios.find(u => u.username === username && u.password === password);
@@ -103,17 +120,20 @@ async function loginUsuario() {
             usuarioActual = usuario;
             window.usuarioActual = usuario;
             guardarSesionUsuario(usuario);
-            document.getElementById('loginUsuarioSection').style.display = 'none';
-            document.getElementById('usuarioPanel').style.display = 'block';
+            
+            const loginSection = document.getElementById('loginUsuarioSection');
+            const panel = document.getElementById('usuarioPanel');
+            if (loginSection) loginSection.style.display = 'none';
+            if (panel) panel.style.display = 'block';
+            
+            if (errorEl) errorEl.textContent = '';
             await cargarPanelUsuario(usuario);
-            document.getElementById('userLoginError').textContent = '';
-            // Activar sonido al iniciar sesión
-            setTimeout(activarSonidoGlobal, 500);
         } else {
-            document.getElementById('userLoginError').textContent = '❌ Usuario o contraseña incorrectos';
+            if (errorEl) errorEl.textContent = '❌ Usuario o contraseña incorrectos';
         }
     } catch (error) {
-        document.getElementById('userLoginError').textContent = '❌ Error de conexión';
+        console.error('Error en login:', error);
+        if (errorEl) errorEl.textContent = '❌ Error de conexión';
     }
 }
 
@@ -123,12 +143,15 @@ function logoutUsuario() {
     limpiarSesion();
     const f = fb();
     if (f) f.dejarDeEscuchar();
-    document.getElementById('loginUsuarioSection').style.display = 'block';
-    document.getElementById('usuarioPanel').style.display = 'none';
+    
+    const loginSection = document.getElementById('loginUsuarioSection');
+    const panel = document.getElementById('usuarioPanel');
+    if (loginSection) loginSection.style.display = 'block';
+    if (panel) panel.style.display = 'none';
 }
 
 // ============================================================
-// ===== CARGAR DATOS =====
+// ===== CARGAR DATOS ADMIN =====
 // ============================================================
 
 async function cargarDatosAdmin() {
@@ -138,7 +161,7 @@ async function cargarDatosAdmin() {
         await cargarClientes();
         await cargarHistorial();
         await cargarLiquidacionAdmin();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('Error cargando datos admin:', e); }
 }
 
 async function cargarUsuarios() {
@@ -278,20 +301,22 @@ function renderPedidosAdmin(pedidos) {
 }
 
 // ============================================================
-// ===== LIQUIDACIONES - INTERFAZ COMPLETA =====
+// ===== LIQUIDACIONES — INTERFAZ COMPLETA =====
 // ============================================================
 
 async function verLiquidacionDetalle(id) {
     const u = usuariosCache.find(u => u.id === id);
-    if (!u) return;
+    if (!u) {
+        alert('Usuario no encontrado');
+        return;
+    }
     
-    // Buscar pedidos completados del usuario
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
+    
     const pedidos = await f.getPedidos();
     const pedidosCompletados = pedidos.filter(p => p.usuarioAsignado === id && p.estado === 'completado');
     
-    // Crear modal
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;z-index:1000;padding:20px;';
@@ -337,13 +362,12 @@ async function pagarLiquidacion(id) {
     if (!confirm('¿Confirmar pago? Esto reiniciará el contador a $0')) return;
     
     const u = usuariosCache.find(u => u.id === id);
-    if (!u) return;
+    if (!u) { alert('Usuario no encontrado'); return; }
     
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
     
     try {
-        // Guardar en historial
         const historial = await f.getHistorial();
         historial.push({
             usuarioId: id,
@@ -354,7 +378,6 @@ async function pagarLiquidacion(id) {
         });
         await f.setHistorial(historial);
         
-        // Resetear contador
         await f.setUsuario(id, {
             ...u,
             liquidacionTotal: 0,
@@ -362,14 +385,15 @@ async function pagarLiquidacion(id) {
             ajustesLiquidacion: []
         });
         
-        // Cerrar modal y recargar
-        document.querySelector('.modal-overlay')?.remove();
+        const modal = document.querySelector('.modal-overlay');
+        if (modal) modal.remove();
+        
         await cargarUsuarios();
         await cargarLiquidaciones();
         alert('✅ Liquidación pagada exitosamente');
     } catch (error) {
+        console.error('Error pagando liquidación:', error);
         alert('Error al pagar liquidación');
-        console.error(error);
     }
 }
 
@@ -388,8 +412,9 @@ async function crearUsuario() {
     const id = await f.getNextId('usuarios');
     await f.setUsuario(id, { nombre, username, password, vehiculo, activo: true, disponible: true, liquidacionTotal: 0, pedidosCompletados: 0, ajustesLiquidacion: [] });
     hideForm('usuario');
-    ['nombre','username','password'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('vehiculo').value = 'bici';
+    ['nombre','username','password'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const vehEl = document.getElementById('vehiculo');
+    if (vehEl) vehEl.value = 'bici';
     await cargarUsuarios();
 }
 
@@ -436,7 +461,7 @@ async function crearCliente() {
     const id = await f.getNextId('clientes');
     await f.setCliente(id, { nombre, direccion, telefono, email, activo: true });
     hideForm('cliente');
-    ['clienteNombre','clienteDireccion','clienteTelefono','clienteEmail'].forEach(id => document.getElementById(id).value = '');
+    ['clienteNombre','clienteDireccion','clienteTelefono','clienteEmail'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     await cargarClientes();
 }
 
@@ -496,14 +521,14 @@ async function crearPedido() {
     });
     
     hideForm('pedido');
-    ['descripcion','origenManual','destino','costoServicio','pagoRepartidor'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('clienteOrigen').value = '';
-    document.getElementById('usuarioAsignado').value = '';
+    ['descripcion','origenManual','destino','costoServicio','pagoRepartidor'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const selCliente = document.getElementById('clienteOrigen');
+    if (selCliente) selCliente.value = '';
+    const selUsuario = document.getElementById('usuarioAsignado');
+    if (selUsuario) selUsuario.value = '';
+    
     await cargarPedidos();
-    // Recargar también los pedidos del usuario si está conectado
-    if (usuarioActual) {
-        await cargarPedidosUsuario(usuarioActual.id);
-    }
+    if (usuarioActual) await cargarPedidosUsuario(usuarioActual.id);
     alert('✅ Pedido creado');
 }
 
@@ -538,12 +563,10 @@ async function completarPedido(id) {
     }
     liquidacionAdmin.total = (liquidacionAdmin.total || 0) + (p.gananciaAdmin || p.costoServicio - p.pagoRepartidor);
     await f.setLiquidacionAdmin(liquidacionAdmin);
-    document.getElementById('totalAdmin').textContent = '$' + (liquidacionAdmin.total || 0);
+    const totalEl = document.getElementById('totalAdmin');
+    if (totalEl) totalEl.textContent = '$' + (liquidacionAdmin.total || 0);
     await cargarPedidos();
-    // Actualizar también el panel del usuario si está conectado
-    if (usuarioActual) {
-        await cargarPedidosUsuario(usuarioActual.id);
-    }
+    if (usuarioActual) await cargarPedidosUsuario(usuarioActual.id);
 }
 
 async function eliminarPedido(id) {
@@ -560,7 +583,7 @@ async function eliminarPedido(id) {
 
 async function ajustarLiquidacion(id) {
     const u = usuariosCache.find(u => u.id === id);
-    if (!u) return;
+    if (!u) { alert('Usuario no encontrado'); return; }
     const concepto = prompt('Concepto (ej: Bono, Descuento, etc.):');
     if (!concepto) return;
     const monto = parseFloat(prompt('Monto (positivo = extra, negativo = descuento):'));
@@ -585,15 +608,18 @@ async function ajustarLiquidacion(id) {
 // ============================================================
 
 async function cargarPanelUsuario(usuario) {
-    document.getElementById('bienvenidaUsuario').textContent = '👋 Hola, ' + usuario.nombre;
-    document.getElementById('vehiculoUsuario').textContent = getVehiculoIcon(usuario.vehiculo);
-    document.getElementById('liquidacionUsuario').textContent = '$' + (usuario.liquidacionTotal || 0);
+    const bienvenida = document.getElementById('bienvenidaUsuario');
+    if (bienvenida) bienvenida.textContent = '👋 Hola, ' + usuario.nombre;
+    
+    const vehiculo = document.getElementById('vehiculoUsuario');
+    if (vehiculo) vehiculo.textContent = getVehiculoIcon(usuario.vehiculo);
+    
+    const liquidacion = document.getElementById('liquidacionUsuario');
+    if (liquidacion) liquidacion.textContent = '$' + (usuario.liquidacionTotal || 0);
+    
     actualizarEstado(usuario);
     await cargarPedidosUsuario(usuario.id);
     iniciarEscucha();
-    
-    // Activar sonido después de cargar el panel
-    setTimeout(activarSonidoGlobal, 1000);
 }
 
 function getVehiculoIcon(v) {
@@ -606,14 +632,23 @@ function actualizarEstado(usuario) {
     const btn = document.getElementById('btnDisponibilidad');
     if (!es || !btn) return;
     if (usuario.activo && usuario.disponible) {
-        es.textContent = '✅ Activo'; es.className = 'badge-active';
-        btn.textContent = '🟢 Disponible'; btn.className = 'btn-success'; btn.disabled = false;
+        es.textContent = '✅ Activo';
+        es.className = 'badge-active';
+        btn.textContent = '🟢 Disponible';
+        btn.className = 'btn-success';
+        btn.disabled = false;
     } else if (usuario.activo && !usuario.disponible) {
-        es.textContent = '⏸️ Pausado'; es.className = 'badge-inactive';
-        btn.textContent = '⏸️ No disponible'; btn.className = 'btn-secondary'; btn.disabled = false;
+        es.textContent = '⏸️ Pausado';
+        es.className = 'badge-inactive';
+        btn.textContent = '⏸️ No disponible';
+        btn.className = 'btn-secondary';
+        btn.disabled = false;
     } else {
-        es.textContent = '❌ Inactivo'; es.className = 'badge-inactive';
-        btn.textContent = '🚫 Inactivo'; btn.className = 'btn-danger'; btn.disabled = true;
+        es.textContent = '❌ Inactivo';
+        es.className = 'badge-inactive';
+        btn.textContent = '🚫 Inactivo';
+        btn.className = 'btn-danger';
+        btn.disabled = true;
     }
 }
 
@@ -634,7 +669,6 @@ async function cargarPedidosUsuario(usuarioId) {
     const f = fb();
     if (!f) return;
     const pedidos = await f.getPedidos();
-    // Actualizar cache global
     pedidosCache = pedidos;
     renderPedidosUsuario(pedidos, usuarioId);
 }
@@ -688,108 +722,121 @@ function renderPedidosUsuario(pedidos, usuarioId) {
     }
 }
 
+// ============================================================
+// ===== TOMAR Y COMPLETAR PEDIDOS (CORREGIDO) =====
+// ============================================================
+
 async function tomarPedido(id) {
-    if (!usuarioActual || !usuarioActual.disponible) {
+    // ✅ VALIDACIÓN: Usuario logueado y disponible
+    if (!usuarioActual) {
+        alert('Debes iniciar sesión');
+        return;
+    }
+    if (!usuarioActual.disponible) {
         alert('No estás disponible para tomar pedidos');
         return;
     }
     if (!confirm('¿Tomar este pedido?')) return;
-    
-    // Buscar el pedido en el cache actualizado
+
+    // ✅ VALIDACIÓN: Buscar pedido en caché
     const p = pedidosCache.find(p => p.id === id);
     if (!p) {
         alert('Error: Pedido no encontrado. Recargando...');
         await cargarPedidosUsuario(usuarioActual.id);
         return;
     }
-    
+
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
-    
+
     try {
         await f.setPedido(id, { ...p, usuarioAsignado: usuarioActual.id, estado: 'asignado' });
-        // Recargar pedidos del usuario
         await cargarPedidosUsuario(usuarioActual.id);
-        // También actualizar el cache del admin si está logueado
-        if (document.getElementById('adminPanel').style.display !== 'none') {
+        
+        // ✅ ACTUALIZAR también el panel de admin si está visible
+        const adminPanel = document.getElementById('adminPanel');
+        if (adminPanel && adminPanel.style.display !== 'none') {
             await cargarPedidos();
         }
         alert('✅ Pedido tomado exitosamente');
     } catch (error) {
+        console.error('Error al tomar pedido:', error);
         alert('Error al tomar pedido');
-        console.error(error);
     }
 }
 
 async function completarPedidoUsuario(id) {
     if (!confirm('¿Completar pedido?')) return;
+    
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
-    
+
     try {
-        // Obtener pedido actualizado
         const pedidos = await f.getPedidos();
         const p = pedidos.find(p => p.id === id);
         if (!p) { alert('Pedido no encontrado'); return; }
-        
+
         await f.setPedido(id, { ...p, estado: 'completado', fechaCompletado: new Date().toISOString() });
-        
+
         // Actualizar liquidación del usuario
         if (usuarioActual) {
             const nuevoTotal = (usuarioActual.liquidacionTotal || 0) + p.pagoRepartidor;
             const nuevosPedidos = (usuarioActual.pedidosCompletados || 0) + 1;
-            await f.setUsuario(usuarioActual.id, { 
-                ...usuarioActual, 
-                liquidacionTotal: nuevoTotal, 
-                pedidosCompletados: nuevosPedidos 
+            await f.setUsuario(usuarioActual.id, {
+                ...usuarioActual,
+                liquidacionTotal: nuevoTotal,
+                pedidosCompletados: nuevosPedidos
             });
             usuarioActual.liquidacionTotal = nuevoTotal;
             usuarioActual.pedidosCompletados = nuevosPedidos;
-            document.getElementById('liquidacionUsuario').textContent = '$' + nuevoTotal;
+            
+            const liquidacionEl = document.getElementById('liquidacionUsuario');
+            if (liquidacionEl) liquidacionEl.textContent = '$' + nuevoTotal;
             guardarSesionUsuario(usuarioActual);
         }
-        
+
         // Actualizar liquidación del admin
         const ganancia = p.gananciaAdmin || p.costoServicio - p.pagoRepartidor;
         liquidacionAdmin.total = (liquidacionAdmin.total || 0) + ganancia;
         await f.setLiquidacionAdmin(liquidacionAdmin);
-        
-        // Recargar vistas
+
         await cargarPedidosUsuario(usuarioActual.id);
-        if (document.getElementById('adminPanel').style.display !== 'none') {
+
+        const adminPanel = document.getElementById('adminPanel');
+        if (adminPanel && adminPanel.style.display !== 'none') {
             await cargarPedidos();
             await cargarUsuarios();
         }
         alert('✅ Pedido completado exitosamente');
     } catch (error) {
+        console.error('Error al completar pedido:', error);
         alert('Error al completar pedido');
-        console.error(error);
     }
 }
 
 // ============================================================
-// ===== NOTIFICACIONES PUSH =====
+// ===== NOTIFICACIONES EN TIEMPO REAL =====
 // ============================================================
 
 function iniciarEscucha() {
     const f = fb();
-    if (!f) { 
-        setTimeout(iniciarEscucha, 2000); 
-        return; 
+    if (!f) {
+        setTimeout(iniciarEscucha, 2000);
+        return;
     }
     console.log('📡 Escuchando pedidos en tiempo real...');
-    
+
     f.escucharNuevosPedidos(function(nuevo) {
         if (ultimoPedidoPendiente === null || nuevo.id !== ultimoPedidoPendiente.id) {
             ultimoPedidoPendiente = nuevo;
-            
-            // Reproducir sonido con fuerza
+
+            // Reproducir sonido (solo si está habilitado)
             if (f.reproducirSonido) {
                 f.reproducirSonido();
                 setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 300);
                 setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 600);
             }
-            
+
             // Alerta visual
             const alerta = document.createElement('div');
             alerta.className = 'alerta-pedido-nuevo';
@@ -809,8 +856,7 @@ function iniciarEscucha() {
             const panel = document.getElementById('usuarioPanel');
             if (panel) panel.insertBefore(alerta, panel.firstChild);
             setTimeout(() => { if (alerta.parentNode) alerta.remove(); }, 15000);
-            
-            // Recargar pedidos
+
             if (usuarioActual) {
                 cargarPedidosUsuario(usuarioActual.id);
             }
@@ -819,19 +865,13 @@ function iniciarEscucha() {
 }
 
 // ============================================================
-// ===== ACTIVAR SONIDO MANUAL =====
+// ===== ACTIVAR SONIDO MANUAL (BOTÓN) =====
 // ============================================================
 
 function activarSonidoManual() {
     const f = fb();
-    if (f && f.activarSonido) {
-        f.activarSonido();
-        if (f.reproducirSonido) {
-            f.reproducirSonido();
-            setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 300);
-            setTimeout(() => { if (f.reproducirSonido) f.reproducirSonido(); }, 600);
-        }
-        alert('🔊 Sonido activado correctamente');
+    if (f && f.activarSonidoManual) {
+        f.activarSonidoManual();
     } else {
         alert('⚠️ Error al activar sonido');
     }
@@ -842,13 +882,15 @@ function activarSonidoManual() {
 // ============================================================
 
 function showTab(tab) {
-    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(el => { if (el) el.style.display = 'none'; });
+    document.querySelectorAll('.tab-btn').forEach(el => { if (el) el.classList.remove('active'); });
     const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'admin'];
     const idx = tabs.indexOf(tab);
     if (idx >= 0) {
-        document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = 'block';
-        document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+        const el = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+        if (el) el.style.display = 'block';
+        const btns = document.querySelectorAll('.tab-btn');
+        if (btns[idx]) btns[idx].classList.add('active');
         if (tab === 'usuarios') cargarUsuarios();
         else if (tab === 'clientes') cargarClientes();
         else if (tab === 'pedidos') cargarPedidos();
@@ -858,19 +900,25 @@ function showTab(tab) {
 }
 
 function showUserTab(tab) {
-    document.querySelectorAll('#usuarioPanel .tab-content').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('#usuarioPanel .tab-btn').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('#usuarioPanel .tab-content').forEach(el => { if (el) el.style.display = 'none'; });
+    document.querySelectorAll('#usuarioPanel .tab-btn').forEach(el => { if (el) el.classList.remove('active'); });
     if (tab === 'pendientes') {
-        document.getElementById('userTabPendientes').style.display = 'block';
-        document.querySelector('#usuarioPanel .tab-btn:first-child').classList.add('active');
+        const el = document.getElementById('userTabPendientes');
+        if (el) el.style.display = 'block';
+        const btn = document.querySelector('#usuarioPanel .tab-btn:first-child');
+        if (btn) btn.classList.add('active');
         if (usuarioActual) cargarPedidosUsuario(usuarioActual.id);
     } else if (tab === 'misPedidos') {
-        document.getElementById('userTabMisPedidos').style.display = 'block';
-        document.querySelector('#usuarioPanel .tab-btn:nth-child(2)').classList.add('active');
+        const el = document.getElementById('userTabMisPedidos');
+        if (el) el.style.display = 'block';
+        const btn = document.querySelector('#usuarioPanel .tab-btn:nth-child(2)');
+        if (btn) btn.classList.add('active');
         if (usuarioActual) cargarPedidosUsuario(usuarioActual.id);
     } else if (tab === 'historial') {
-        document.getElementById('userTabHistorial').style.display = 'block';
-        document.querySelector('#usuarioPanel .tab-btn:nth-child(3)').classList.add('active');
+        const el = document.getElementById('userTabHistorial');
+        if (el) el.style.display = 'block';
+        const btn = document.querySelector('#usuarioPanel .tab-btn:nth-child(3)');
+        if (btn) btn.classList.add('active');
         if (usuarioActual) cargarPedidosUsuario(usuarioActual.id);
     }
 }
@@ -898,12 +946,14 @@ async function cargarLiquidaciones() {
 
 function showForm(tipo) {
     const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm' };
-    if (map[tipo]) document.getElementById(map[tipo]).style.display = 'block';
+    const el = document.getElementById(map[tipo]);
+    if (el) el.style.display = 'block';
 }
 
 function hideForm(tipo) {
     const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm' };
-    if (map[tipo]) document.getElementById(map[tipo]).style.display = 'none';
+    const el = document.getElementById(map[tipo]);
+    if (el) el.style.display = 'none';
 }
 
 // ============================================================
@@ -914,10 +964,10 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🚚 Gestor de Entregas v3.0');
     console.log('Admin: LedZepp1');
     console.log('Usuarios: carlos123, maria456, julio789');
-    
-    // Activar sonido al cargar
-    setTimeout(activarSonidoGlobal, 1000);
-    
+    console.log('🔊 Para activar el sonido, toca el botón "Activar Sonido" o la pantalla');
+
+    // ✅ NO se activa sonido automáticamente — solo con interacción del usuario
+
     if (typeof window.firebaseFunctions === 'undefined') {
         const check = setInterval(function() {
             if (typeof window.firebaseFunctions !== 'undefined') {
@@ -932,16 +982,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function iniciarSistema() {
     if (obtenerSesionAdmin()) {
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('adminPanel').style.display = 'block';
+        const loginSection = document.getElementById('loginSection');
+        const adminPanel = document.getElementById('adminPanel');
+        if (loginSection) loginSection.style.display = 'none';
+        if (adminPanel) adminPanel.style.display = 'block';
         cargarDatosAdmin();
     }
     const usuario = obtenerSesionUsuario();
     if (usuario) {
         usuarioActual = usuario;
         window.usuarioActual = usuario;
-        document.getElementById('loginUsuarioSection').style.display = 'none';
-        document.getElementById('usuarioPanel').style.display = 'block';
+        const loginSection = document.getElementById('loginUsuarioSection');
+        const panel = document.getElementById('usuarioPanel');
+        if (loginSection) loginSection.style.display = 'none';
+        if (panel) panel.style.display = 'block';
         cargarPanelUsuario(usuario);
     }
     if ('Notification' in window && Notification.permission === 'default') {

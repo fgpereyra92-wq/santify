@@ -15,10 +15,12 @@ const firebaseConfig = {
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
+
+// Mantener conexión activa
 database.goOnline();
 
 // ============================================================
-// ✅ VERIFICAR CONEXIÓN
+// ✅ MONITOREO DE CONEXIÓN
 // ============================================================
 
 database.ref('.info/connected').on('value', function(snap) {
@@ -30,15 +32,17 @@ database.ref('.info/connected').on('value', function(snap) {
 });
 
 // ============================================================
-// 🔊 SONIDO - VERSIÓN MEJORADA PARA MÓVILES
+// 🔊 SONIDO — SOLO CON INTERACCIÓN DEL USUARIO
 // ============================================================
 
 let audioElement = null;
 let audioContext = null;
-let sonidoInicializado = false;
+let sonidoHabilitado = false; // ← CLAVE: solo se activa con acción del usuario
 
-// Inicializar AudioContext (necesario para móviles)
-function initAudioContext() {
+// Crear o reanudar AudioContext SOLO si el usuario ya interactuó
+function prepararAudio() {
+    if (sonidoHabilitado) return true;
+
     try {
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -46,15 +50,17 @@ function initAudioContext() {
         if (audioContext.state === 'suspended') {
             audioContext.resume();
         }
+        sonidoHabilitado = true;
+        console.log('🔊 Sonido habilitado por acción del usuario');
         return true;
     } catch (e) {
-        console.warn('Error inicializando AudioContext:', e);
+        console.warn('⚠️ Error preparando audio:', e.message);
         return false;
     }
 }
 
-// Cargar archivo de sonido
-function getAudioElement() {
+// Cargar el archivo de sonido (solo si es necesario)
+function obtenerAudio() {
     if (audioElement) return audioElement;
     try {
         audioElement = new Audio('sonido.mp3');
@@ -63,57 +69,21 @@ function getAudioElement() {
         audioElement.volume = 0.8;
         return audioElement;
     } catch (e) {
-        console.warn('Error cargando sonido:', e);
+        console.warn('⚠️ Error cargando sonido.mp3:', e.message);
         return null;
     }
 }
 
-// Activar sonido (se llama al tocar la pantalla)
-function activarSonido() {
-    if (sonidoInicializado) return;
-    
-    // Inicializar AudioContext
-    initAudioContext();
-    
-    // Reproducir un "click" silencioso para activar el audio
-    try {
-        const audio = getAudioElement();
-        if (audio) {
-            audio.volume = 0.01;
-            audio.play().then(() => {
-                audio.pause();
-                audio.currentTime = 0;
-                audio.volume = 0.8;
-                sonidoInicializado = true;
-                console.log('🔊 Sonido activado correctamente');
-            }).catch(e => {
-                console.warn('Error activando sonido:', e);
-            });
-        }
-    } catch (e) {
-        console.warn('Error en activarSonido:', e);
-    }
-}
-
-// Reproducir sonido de notificación
+// Reproducir sonido — SOLO si el usuario ya lo habilitó
 function reproducirSonido() {
-    if (!sonidoInicializado) {
-        // Intentar activar sonido primero
-        activarSonido();
-        // Esperar un poco y reproducir
-        setTimeout(() => {
-            reproducirSonidoReal();
-        }, 100);
+    if (!sonidoHabilitado) {
+        console.log('🔇 Sonido no habilitado aún. El usuario debe tocar "Activar Sonido".');
         return;
     }
-    reproducirSonidoReal();
-}
 
-function reproducirSonidoReal() {
     try {
-        // Primero intentar con AudioContext para más control
+        // Opción 1: AudioContext (tono sintético)
         if (audioContext && audioContext.state === 'running') {
-            // Crear un tono corto como respaldo
             const osc = audioContext.createOscillator();
             const gain = audioContext.createGain();
             osc.connect(gain);
@@ -124,8 +94,7 @@ function reproducirSonidoReal() {
             gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.15);
             osc.start(audioContext.currentTime);
             osc.stop(audioContext.currentTime + 0.15);
-            
-            // Segundo tono
+
             setTimeout(() => {
                 try {
                     const osc2 = audioContext.createOscillator();
@@ -141,44 +110,61 @@ function reproducirSonidoReal() {
                 } catch (e) {}
             }, 180);
         }
-        
-        // También reproducir el MP3 (más familiar para usuarios)
-        const audio = getAudioElement();
+
+        // Opción 2: MP3 (más familiar para el usuario)
+        const audio = obtenerAudio();
         if (audio) {
             audio.currentTime = 0;
             audio.volume = 0.8;
-            audio.play().catch(e => console.warn('Error con MP3:', e));
+            audio.play().catch(e => console.warn('⚠️ Error con MP3:', e.message));
         }
-        
-        // Vibración para móviles
+
+        // Vibración (móviles)
         if (navigator.vibrate) {
             navigator.vibrate([100, 50, 100, 50, 200]);
         }
     } catch (e) {
-        console.warn('Error en reproducirSonido:', e);
+        console.warn('⚠️ Error en reproducirSonido:', e.message);
+    }
+}
+
+// Función que se llama desde el botón "Activar Sonido"
+function activarSonidoManual() {
+    const ok = prepararAudio();
+    if (ok) {
+        // Reproducir sonido de prueba para confirmar
+        reproducirSonido();
+        setTimeout(reproducirSonido, 300);
+        alert('🔊 Sonido activado correctamente');
+    } else {
+        alert('⚠️ No se pudo activar el sonido. Intenta nuevamente.');
     }
 }
 
 // ============================================================
-// 📡 FUNCIONES FIREBASE
+// 📡 FUNCIONES DE FIREBASE (CORREGIDAS)
 // ============================================================
 
 function escucharNuevosPedidos(callback) {
     const pedidosRef = database.ref('pedidos');
+
+    // ✅ CORRECCIÓN: keepSynced se aplica a la referencia, no al resultado de orderByChild
     pedidosRef.keepSynced(true);
-    
+
     pedidosRef.orderByChild('estado').equalTo('pendiente').on('child_added', function(snapshot) {
         const pedido = snapshot.val();
         const id = parseInt(snapshot.key);
         if (pedido && pedido.estado === 'pendiente') {
             console.log('📦 Nuevo pedido #' + id + ': ' + pedido.descripcion);
-            // Reproducir sonido con fuerza
-            for (let i = 0; i < 3; i++) {
-                setTimeout(() => { reproducirSonido(); }, i * 300);
-            }
+            // Reproducir sonido varias veces para asegurar
+            reproducirSonido();
+            setTimeout(reproducirSonido, 300);
+            setTimeout(reproducirSonido, 600);
             callback({ id, ...pedido });
         }
     });
+
+    console.log('📡 Escuchando pedidos en tiempo real (keepSynced activado)');
 }
 
 function dejarDeEscuchar() {
@@ -186,7 +172,10 @@ function dejarDeEscuchar() {
     database.ref('pedidos').keepSynced(false);
 }
 
-// ===== USUARIOS =====
+// ============================================================
+// 📦 CRUD — USUARIOS
+// ============================================================
+
 async function getUsuarios() {
     try {
         const snapshot = await database.ref('usuarios').once('value');
@@ -194,7 +183,7 @@ async function getUsuarios() {
         if (!data) return [];
         return Object.keys(data).map(key => ({ id: parseInt(key), ...data[key] }));
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error obteniendo usuarios:', error);
         return [];
     }
 }
@@ -209,7 +198,10 @@ async function deleteUsuario(id) {
     return true;
 }
 
-// ===== PEDIDOS =====
+// ============================================================
+// 📦 CRUD — PEDIDOS
+// ============================================================
+
 async function getPedidos() {
     try {
         const snapshot = await database.ref('pedidos').once('value');
@@ -217,6 +209,7 @@ async function getPedidos() {
         if (!data) return [];
         return Object.keys(data).map(key => ({ id: parseInt(key), ...data[key] }));
     } catch (error) {
+        console.error('Error obteniendo pedidos:', error);
         return [];
     }
 }
@@ -231,7 +224,10 @@ async function deletePedido(id) {
     return true;
 }
 
-// ===== CLIENTES =====
+// ============================================================
+// 📦 CRUD — CLIENTES
+// ============================================================
+
 async function getClientes() {
     try {
         const snapshot = await database.ref('clientes').once('value');
@@ -239,6 +235,7 @@ async function getClientes() {
         if (!data) return [];
         return Object.keys(data).map(key => ({ id: parseInt(key), ...data[key] }));
     } catch (error) {
+        console.error('Error obteniendo clientes:', error);
         return [];
     }
 }
@@ -253,13 +250,17 @@ async function deleteCliente(id) {
     return true;
 }
 
-// ===== LIQUIDACIONES =====
+// ============================================================
+// 📦 LIQUIDACIONES
+// ============================================================
+
 async function getHistorial() {
     try {
         const snapshot = await database.ref('historialLiquidaciones').once('value');
         const data = snapshot.val();
         return data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
     } catch (error) {
+        console.error('Error obteniendo historial:', error);
         return [];
     }
 }
@@ -277,6 +278,7 @@ async function getLiquidacionAdmin() {
         const data = snapshot.val();
         return data || { total: 0, historial: [] };
     } catch (error) {
+        console.error('Error obteniendo liquidacionAdmin:', error);
         return { total: 0, historial: [] };
     }
 }
@@ -296,6 +298,7 @@ async function getNextId(path) {
         const maxId = Math.max(...ids);
         return maxId + 1;
     } catch (error) {
+        console.warn('Error obteniendo próximo ID, usando 1:', error);
         return 1;
     }
 }
@@ -313,12 +316,12 @@ async function crearPedidoConPushup(data) {
 }
 
 // ============================================================
-// 📢 EXPORTAR
+// 📢 EXPORTAR FUNCIONES (GLOBALES)
 // ============================================================
 
 window.firebaseFunctions = {
     escucharNuevosPedidos,
-    dejarDeEscuchar: dejarDeEscuchar,
+    dejarDeEscuchar,
     getUsuarios,
     setUsuario,
     deleteUsuario,
@@ -335,8 +338,9 @@ window.firebaseFunctions = {
     getNextId,
     crearPedidoConPushup,
     database,
-    activarSonido,
-    reproducirSonido
+    activarSonidoManual,
+    reproducirSonido,
+    prepararAudio
 };
 
 window.getFirebase = function() {
@@ -344,4 +348,4 @@ window.getFirebase = function() {
 };
 
 console.log('🔥 Firebase OK');
-console.log('🔊 Sonido preparado');
+console.log('🔊 Sonido preparado (esperando interacción del usuario)');

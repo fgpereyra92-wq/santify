@@ -1,5 +1,5 @@
 // ============================================================
-// ===== app.js - VERSIÓN COMPLETA CORREGIDA =====
+// ===== app.js =====
 // ============================================================
 
 const ADMIN_PASSWORD = 'LedZepp1';
@@ -13,80 +13,47 @@ let ultimoPedidoPendiente = null;
 let sonidoActivado = false;
 
 // ============================================================
-// ===== REFERENCIA A FIREBASE =====
+// ===== FIREBASE HELPER =====
 // ============================================================
 
-// Esta función ahora está definida globalmente en firebase-config.js
-// pero la declaramos aquí también por si acaso
-if (typeof window.getFirebase === 'undefined') {
-    window.getFirebase = function() {
-        if (typeof window.firebaseFunctions === 'undefined') {
-            console.error('❌ Firebase no está cargado');
-            return null;
-        }
-        return window.firebaseFunctions;
-    };
+function fb() {
+    if (typeof window.firebaseFunctions === 'undefined') {
+        console.error('❌ Firebase no cargado');
+        return null;
+    }
+    return window.firebaseFunctions;
 }
-
-// ============================================================
-// ===== ACTIVAR SONIDO GLOBAL =====
-// ============================================================
 
 function activarSonidoGlobal() {
     if (sonidoActivado) return;
-    
-    try {
-        const fb = window.getFirebase();
-        if (fb && fb.activarSonido) {
-            fb.activarSonido();
-            sonidoActivado = true;
-            console.log('🔊 Sonido activado por interacción del usuario');
-        }
-    } catch (e) {
-        console.warn('⚠️ Error activando sonido:', e);
+    const f = fb();
+    if (f && f.activarSonido) {
+        f.activarSonido();
+        sonidoActivado = true;
+        console.log('🔊 Sonido activado');
     }
 }
 
-// Detectar interacción del usuario para activar sonido
-document.addEventListener('click', function() {
-    activarSonidoGlobal();
-});
-document.addEventListener('touchstart', function() {
-    activarSonidoGlobal();
-});
+document.addEventListener('click', function() { activarSonidoGlobal(); });
+document.addEventListener('touchstart', function() { activarSonidoGlobal(); });
 
 // ============================================================
 // ===== SESIÓN =====
 // ============================================================
 
-function guardarSesionAdmin(estado) {
-    sessionStorage.setItem('adminAutenticado', JSON.stringify(estado));
-}
-
-function obtenerSesionAdmin() {
-    return JSON.parse(sessionStorage.getItem('adminAutenticado') || 'false');
-}
-
-function guardarSesionUsuario(usuario) {
-    sessionStorage.setItem('usuarioActual', JSON.stringify(usuario));
-}
-
-function obtenerSesionUsuario() {
-    return JSON.parse(sessionStorage.getItem('usuarioActual') || 'null');
-}
-
-function limpiarSesion() {
-    sessionStorage.removeItem('adminAutenticado');
-    sessionStorage.removeItem('usuarioActual');
-}
+function guardarSesionAdmin(e) { sessionStorage.setItem('admin', JSON.stringify(e)); }
+function obtenerSesionAdmin() { return JSON.parse(sessionStorage.getItem('admin') || 'false'); }
+function guardarSesionUsuario(u) { sessionStorage.setItem('usuario', JSON.stringify(u)); }
+function obtenerSesionUsuario() { return JSON.parse(sessionStorage.getItem('usuario') || 'null'); }
+function limpiarSesion() { sessionStorage.removeItem('admin'); sessionStorage.removeItem('usuario'); }
 
 // ============================================================
 // ===== LOGIN ADMIN =====
 // ============================================================
 
 function loginAdmin() {
-    const password = document.getElementById('adminPassword').value;
-    if (password === ADMIN_PASSWORD) {
+    const pass = document.getElementById('adminPassword').value;
+    if (pass === ADMIN_PASSWORD) {
         guardarSesionAdmin(true);
         document.getElementById('loginSection').style.display = 'none';
         document.getElementById('adminPanel').style.display = 'block';
@@ -101,8 +68,8 @@ function loginAdmin() {
 function logout() {
     if (!confirm('¿Cerrar sesión?')) return;
     limpiarSesion();
-    const fb = window.getFirebase();
-    if (fb) fb.dejarDeEscucharNuevosPedidos();
+    const f = fb();
+    if (f) f.dejarDeEscuchar();
     document.getElementById('loginSection').style.display = 'block';
     document.getElementById('adminPanel').style.display = 'none';
 }
@@ -116,13 +83,10 @@ async function loginUsuario() {
     const password = document.getElementById('userPass').value;
     
     try {
-        const fb = window.getFirebase();
-        if (!fb) {
-            document.getElementById('userLoginError').textContent = '❌ Error de conexión con Firebase';
-            return;
-        }
+        const f = fb();
+        if (!f) { document.getElementById('userLoginError').textContent = '❌ Error de conexión'; return; }
         
-        const usuarios = await fb.getUsuarios();
+        const usuarios = await f.getUsuarios();
         const usuario = usuarios.find(u => u.username === username && u.password === password);
         
         if (usuario) {
@@ -137,7 +101,6 @@ async function loginUsuario() {
             document.getElementById('userLoginError').textContent = '❌ Usuario o contraseña incorrectos';
         }
     } catch (error) {
-        console.error('Error en login:', error);
         document.getElementById('userLoginError').textContent = '❌ Error de conexión';
     }
 }
@@ -146,14 +109,14 @@ function logoutUsuario() {
     usuarioActual = null;
     window.usuarioActual = null;
     limpiarSesion();
-    const fb = window.getFirebase();
-    if (fb) fb.dejarDeEscucharNuevosPedidos();
+    const f = fb();
+    if (f) f.dejarDeEscuchar();
     document.getElementById('loginUsuarioSection').style.display = 'block';
     document.getElementById('usuarioPanel').style.display = 'none';
 }
 
 // ============================================================
-// ===== CARGAR DATOS ADMIN =====
+// ===== CARGAR DATOS =====
 // ============================================================
 
 async function cargarDatosAdmin() {
@@ -161,104 +124,78 @@ async function cargarDatosAdmin() {
         await cargarUsuarios();
         await cargarPedidos();
         await cargarClientes();
-        await cargarHistorialLiquidaciones();
+        await cargarHistorial();
         await cargarLiquidacionAdmin();
-    } catch (error) {
-        console.error('Error cargando datos:', error);
-    }
+    } catch (e) { console.error(e); }
 }
 
 async function cargarUsuarios() {
-    try {
-        const fb = window.getFirebase();
-        if (!fb) return;
-        usuariosCache = await fb.getUsuarios();
-        renderUsuarios(usuariosCache);
-    } catch (error) {
-        console.error('Error cargando usuarios:', error);
-    }
+    const f = fb();
+    if (!f) return;
+    usuariosCache = await f.getUsuarios();
+    renderUsuarios(usuariosCache);
 }
 
 async function cargarPedidos() {
-    try {
-        const fb = window.getFirebase();
-        if (!fb) return;
-        pedidosCache = await fb.getPedidos();
-        renderPedidosAdmin(pedidosCache);
-        
-        const selectUsuario = document.getElementById('usuarioAsignado');
-        if (selectUsuario) {
-            const usuariosActivos = usuariosCache.filter(u => u.activo);
-            selectUsuario.innerHTML = '<option value="">Sin asignar</option>' + 
-                usuariosActivos.map(u => `<option value="${u.id}">${u.nombre} (${u.vehiculo})</option>`).join('');
-        }
-    } catch (error) {
-        console.error('Error cargando pedidos:', error);
+    const f = fb();
+    if (!f) return;
+    pedidosCache = await f.getPedidos();
+    renderPedidosAdmin(pedidosCache);
+    
+    const sel = document.getElementById('usuarioAsignado');
+    if (sel) {
+        const activos = usuariosCache.filter(u => u.activo);
+        sel.innerHTML = '<option value="">Sin asignar</option>' + 
+            activos.map(u => `<option value="${u.id}">${u.nombre} (${u.vehiculo})</option>`).join('');
     }
 }
 
 async function cargarClientes() {
-    try {
-        const fb = window.getFirebase();
-        if (!fb) return;
-        clientesCache = await fb.getClientes();
-        renderClientes(clientesCache);
-        
-        const selectCliente = document.getElementById('clienteOrigen');
-        if (selectCliente) {
-            const clientesActivos = clientesCache.filter(c => c.activo);
-            selectCliente.innerHTML = '<option value="">Seleccionar cliente (origen)</option>' + 
-                clientesActivos.map(c => `<option value="${c.id}">${c.nombre} - ${c.direccion}</option>`).join('');
-        }
-    } catch (error) {
-        console.error('Error cargando clientes:', error);
+    const f = fb();
+    if (!f) return;
+    clientesCache = await f.getClientes();
+    renderClientes(clientesCache);
+    
+    const sel = document.getElementById('clienteOrigen');
+    if (sel) {
+        const activos = clientesCache.filter(c => c.activo);
+        sel.innerHTML = '<option value="">Seleccionar cliente</option>' + 
+            activos.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
     }
 }
 
-async function cargarHistorialLiquidaciones() {
-    try {
-        const fb = window.getFirebase();
-        if (!fb) return;
-        historialLiquidaciones = await fb.getHistorialLiquidaciones();
-    } catch (error) {
-        historialLiquidaciones = [];
-    }
+async function cargarHistorial() {
+    const f = fb();
+    if (!f) return;
+    historialLiquidaciones = await f.getHistorial();
 }
 
 async function cargarLiquidacionAdmin() {
-    try {
-        const fb = window.getFirebase();
-        if (!fb) return;
-        liquidacionAdmin = await fb.getLiquidacionAdmin();
-        const totalAdmin = document.getElementById('totalAdmin');
-        if (totalAdmin) {
-            totalAdmin.textContent = `$${liquidacionAdmin.total || 0}`;
-        }
-    } catch (error) {
-        liquidacionAdmin = { total: 0, historial: [] };
-    }
+    const f = fb();
+    if (!f) return;
+    liquidacionAdmin = await f.getLiquidacionAdmin();
+    const el = document.getElementById('totalAdmin');
+    if (el) el.textContent = '$' + (liquidacionAdmin.total || 0);
 }
 
 // ============================================================
-// ===== RENDER USUARIOS =====
+// ===== RENDER =====
 // ============================================================
 
 function renderUsuarios(usuarios) {
     const container = document.getElementById('listaUsuarios');
     if (!container) return;
-    
     if (!usuarios || usuarios.length === 0) {
-        container.innerHTML = '<p>No hay usuarios registrados</p>';
+        container.innerHTML = '<p>No hay usuarios</p>';
         return;
     }
-    
     container.innerHTML = usuarios.map(u => `
         <div class="card">
             <h4>${u.nombre}</h4>
             <p>👤 @${u.username}</p>
             <p>🚗 ${u.vehiculo}</p>
             <p>💰 $${u.liquidacionTotal || 0}</p>
-            <p>📦 ${u.pedidosCompletados || 0} pedidos</p>
+            <p>📦 ${u.pedidosCompletados || 0}</p>
             <span class="badge ${u.activo && u.disponible ? 'badge-active' : 'badge-inactive'}">
                 ${u.activo ? (u.disponible ? '🟢 Disponible' : '⏸️ No disponible') : '❌ Inactivo'}
             </span>
@@ -269,7 +206,7 @@ function renderUsuarios(usuarios) {
                 <button onclick="toggleDisponibilidadAdmin(${u.id})" class="${u.disponible ? 'btn-secondary' : 'btn-success'}" ${!u.activo ? 'disabled' : ''}>
                     ${u.disponible ? '⏸️ Pausar' : '▶️ Activar'}
                 </button>
-                <button onclick="verLiquidacionUsuario(${u.id})" class="btn-primary">💰 Liquidación</button>
+                <button onclick="verLiquidacion(${u.id})" class="btn-primary">💰 Liquidación</button>
                 <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
                 <button onclick="eliminarUsuario(${u.id})" class="btn-danger">Eliminar</button>
             </div>
@@ -277,94 +214,18 @@ function renderUsuarios(usuarios) {
     `).join('');
 }
 
-// ============================================================
-// ===== CRUD USUARIOS =====
-// ============================================================
-
-async function crearUsuario() {
-    const nombre = document.getElementById('nombre').value;
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const vehiculo = document.getElementById('vehiculo').value;
-    
-    if (!nombre || !username || !password) {
-        alert('Todos los campos son obligatorios');
-        return;
-    }
-    
-    try {
-        const fb = window.getFirebase();
-        if (!fb) { alert('Error de conexión con Firebase'); return; }
-        
-        const id = await fb.getNextId('usuarios');
-        await fb.setUsuario(id, {
-            nombre, username, password, vehiculo,
-            activo: true, disponible: true,
-            liquidacionTotal: 0, pedidosCompletados: 0,
-            ajustesLiquidacion: []
-        });
-        hideForm('usuario');
-        document.getElementById('nombre').value = '';
-        document.getElementById('username').value = '';
-        document.getElementById('password').value = '';
-        document.getElementById('vehiculo').value = 'bici';
-        await cargarUsuarios();
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al crear usuario');
-    }
-}
-
-async function toggleUsuarioActivo(id) {
-    const usuario = usuariosCache.find(u => u.id === id);
-    if (!usuario) return;
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    await fb.setUsuario(id, { ...usuario, activo: !usuario.activo });
-    await cargarUsuarios();
-}
-
-async function toggleDisponibilidadAdmin(id) {
-    const usuario = usuariosCache.find(u => u.id === id);
-    if (!usuario || !usuario.activo) {
-        alert('El usuario está inactivo. Actívalo primero.');
-        return;
-    }
-    const nuevoEstado = !usuario.disponible;
-    if (!confirm(`¿Cambiar disponibilidad de ${usuario.nombre} a "${nuevoEstado ? 'disponible' : 'no disponible'}"?`)) return;
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    await fb.setUsuario(id, { ...usuario, disponible: nuevoEstado });
-    await cargarUsuarios();
-}
-
-async function eliminarUsuario(id) {
-    if (!confirm('¿Eliminar este usuario?')) return;
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    await fb.deleteUsuario(id);
-    await cargarUsuarios();
-}
-
-// ============================================================
-// ===== RENDER CLIENTES =====
-// ============================================================
-
 function renderClientes(clientes) {
     const container = document.getElementById('listaClientes');
     if (!container) return;
-    
     if (!clientes || clientes.length === 0) {
-        container.innerHTML = '<p>No hay clientes registrados</p>';
+        container.innerHTML = '<p>No hay clientes</p>';
         return;
     }
-    
     container.innerHTML = clientes.map(c => `
         <div class="card">
             <h4>${c.nombre}</h4>
             <p>📍 ${c.direccion || 'Sin dirección'}</p>
             <p>📞 ${c.telefono || 'Sin teléfono'}</p>
-            <p>✉️ ${c.email || 'Sin email'}</p>
             <span class="badge ${c.activo ? 'badge-active' : 'badge-inactive'}">
                 ${c.activo ? '✅ Activo' : '❌ Inactivo'}
             </span>
@@ -378,6 +239,80 @@ function renderClientes(clientes) {
     `).join('');
 }
 
+function renderPedidosAdmin(pedidos) {
+    const container = document.getElementById('listaPedidos');
+    if (!container) return;
+    if (!pedidos || pedidos.length === 0) {
+        container.innerHTML = '<p>No hay pedidos</p>';
+        return;
+    }
+    container.innerHTML = pedidos.map(p => {
+        const u = usuariosCache.find(u => u.id === p.usuarioAsignado);
+        return `
+        <div class="card">
+            <h4>📦 ${p.descripcion}</h4>
+            <p>📍 ${p.origen || 'Sin origen'} → ${p.destino || 'Sin destino'}</p>
+            <p>💰 Servicio: $${p.costoServicio || 0} | Repartidor: $${p.pagoRepartidor || 0}</p>
+            <p>👤 ${u ? u.nombre : 'Sin asignar'}</p>
+            <p>🕐 ${p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleString() : 'Sin fecha'}</p>
+            <span class="badge badge-${p.estado || 'pendiente'}">${(p.estado || 'pendiente').toUpperCase()}</span>
+            <div class="card-actions">
+                ${p.estado === 'pendiente' ? `<button onclick="asignarPedido(${p.id})" class="btn-primary">Asignar</button>` : ''}
+                ${p.estado === 'asignado' ? `<button onclick="completarPedido(${p.id})" class="btn-success">Completar</button>` : ''}
+                <button onclick="eliminarPedido(${p.id})" class="btn-danger">Eliminar</button>
+            </div>
+        </div>
+    `}).join('');
+}
+
+// ============================================================
+// ===== CRUD USUARIOS =====
+// ============================================================
+
+async function crearUsuario() {
+    const nombre = document.getElementById('nombre').value;
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const vehiculo = document.getElementById('vehiculo').value;
+    if (!nombre || !username || !password) { alert('Completa todos los campos'); return; }
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    const id = await f.getNextId('usuarios');
+    await f.setUsuario(id, { nombre, username, password, vehiculo, activo: true, disponible: true, liquidacionTotal: 0, pedidosCompletados: 0, ajustesLiquidacion: [] });
+    hideForm('usuario');
+    ['nombre','username','password'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('vehiculo').value = 'bici';
+    await cargarUsuarios();
+}
+
+async function toggleUsuarioActivo(id) {
+    const u = usuariosCache.find(u => u.id === id);
+    if (!u) return;
+    const f = fb();
+    if (!f) return;
+    await f.setUsuario(id, { ...u, activo: !u.activo });
+    await cargarUsuarios();
+}
+
+async function toggleDisponibilidadAdmin(id) {
+    const u = usuariosCache.find(u => u.id === id);
+    if (!u || !u.activo) { alert('Usuario inactivo'); return; }
+    const nuevo = !u.disponible;
+    if (!confirm(`¿Cambiar a ${nuevo ? 'disponible' : 'no disponible'}?`)) return;
+    const f = fb();
+    if (!f) return;
+    await f.setUsuario(id, { ...u, disponible: nuevo });
+    await cargarUsuarios();
+}
+
+async function eliminarUsuario(id) {
+    if (!confirm('¿Eliminar usuario?')) return;
+    const f = fb();
+    if (!f) return;
+    await f.deleteUsuario(id);
+    await cargarUsuarios();
+}
+
 // ============================================================
 // ===== CRUD CLIENTES =====
 // ============================================================
@@ -387,81 +322,31 @@ async function crearCliente() {
     const direccion = document.getElementById('clienteDireccion').value;
     const telefono = document.getElementById('clienteTelefono').value;
     const email = document.getElementById('clienteEmail').value;
-    
-    if (!nombre || !direccion) {
-        alert('Nombre y dirección son obligatorios');
-        return;
-    }
-    
-    try {
-        const fb = window.getFirebase();
-        if (!fb) { alert('Error de conexión con Firebase'); return; }
-        
-        const id = await fb.getNextId('clientes');
-        await fb.setCliente(id, { nombre, direccion, telefono, email, activo: true });
-        hideForm('cliente');
-        document.getElementById('clienteNombre').value = '';
-        document.getElementById('clienteDireccion').value = '';
-        document.getElementById('clienteTelefono').value = '';
-        document.getElementById('clienteEmail').value = '';
-        await cargarClientes();
-        await cargarPedidos();
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al crear cliente');
-    }
+    if (!nombre || !direccion) { alert('Nombre y dirección son obligatorios'); return; }
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    const id = await f.getNextId('clientes');
+    await f.setCliente(id, { nombre, direccion, telefono, email, activo: true });
+    hideForm('cliente');
+    ['clienteNombre','clienteDireccion','clienteTelefono','clienteEmail'].forEach(id => document.getElementById(id).value = '');
+    await cargarClientes();
 }
 
 async function toggleClienteActivo(id) {
-    const cliente = clientesCache.find(c => c.id === id);
-    if (!cliente) return;
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    await fb.setCliente(id, { ...cliente, activo: !cliente.activo });
+    const c = clientesCache.find(c => c.id === id);
+    if (!c) return;
+    const f = fb();
+    if (!f) return;
+    await f.setCliente(id, { ...c, activo: !c.activo });
     await cargarClientes();
-    await cargarPedidos();
 }
 
 async function eliminarCliente(id) {
-    if (!confirm('¿Eliminar este cliente?')) return;
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    await fb.deleteCliente(id);
+    if (!confirm('¿Eliminar cliente?')) return;
+    const f = fb();
+    if (!f) return;
+    await f.deleteCliente(id);
     await cargarClientes();
-    await cargarPedidos();
-}
-
-// ============================================================
-// ===== RENDER PEDIDOS ADMIN =====
-// ============================================================
-
-function renderPedidosAdmin(pedidos) {
-    const container = document.getElementById('listaPedidos');
-    if (!container) return;
-    if (!pedidos || pedidos.length === 0) {
-        container.innerHTML = '<p>No hay pedidos registrados</p>';
-        return;
-    }
-    
-    container.innerHTML = pedidos.map(p => {
-        const usuario = usuariosCache.find(u => u.id === p.usuarioAsignado);
-        return `
-        <div class="card">
-            <h4>📦 ${p.descripcion}</h4>
-            <p>📍 ${p.origen || 'Sin origen'} → ${p.destino || 'Sin destino'}</p>
-            <p>💰 Servicio: $${p.costoServicio || 0} | Repartidor: $${p.pagoRepartidor || 0}</p>
-            <p>💼 Ganancia Admin: $${p.gananciaAdmin || (p.costoServicio - p.pagoRepartidor)}</p>
-            <p>👤 ${usuario ? usuario.nombre : 'Sin asignar'}</p>
-            <p>🕐 Creado: ${p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleString() : 'Sin fecha'}</p>
-            ${p.fechaCompletado ? `<p>✅ Entregado: ${new Date(p.fechaCompletado).toLocaleString()}</p>` : ''}
-            <span class="badge badge-${p.estado || 'pendiente'}">${(p.estado || 'pendiente').toUpperCase()}</span>
-            <div class="card-actions">
-                ${p.estado === 'pendiente' ? `<button onclick="asignarPedido(${p.id})" class="btn-primary">Asignar</button>` : ''}
-                ${p.estado === 'asignado' ? `<button onclick="completarPedido(${p.id})" class="btn-success">Completar</button>` : ''}
-                <button onclick="eliminarPedido(${p.id})" class="btn-danger">Eliminar</button>
-            </div>
-        </div>
-    `).join('');
 }
 
 // ============================================================
@@ -479,106 +364,77 @@ async function crearPedido() {
     
     let origen = '';
     if (clienteId) {
-        const cliente = clientesCache.find(c => c.id === parseInt(clienteId));
-        origen = cliente ? `${cliente.nombre} - ${cliente.direccion}` : origenManual;
+        const c = clientesCache.find(c => c.id === parseInt(clienteId));
+        origen = c ? c.nombre : origenManual;
     } else if (origenManual) {
         origen = origenManual;
     } else {
-        alert('Debes seleccionar un cliente o escribir un origen manual');
+        alert('Selecciona un cliente o escribe origen manual');
         return;
     }
-    
     if (!descripcion || !origen || !destino || !costoServicio || !pagoRepartidor) {
-        alert('Todos los campos son obligatorios');
+        alert('Completa todos los campos');
         return;
     }
     
-    try {
-        const fb = window.getFirebase();
-        if (!fb) { alert('Error de conexión con Firebase'); return; }
-        
-        await fb.crearPedidoConPushup({
-            descripcion, origen, destino,
-            costoServicio, pagoRepartidor,
-            clienteOrigenId: clienteId || null,
-            gananciaAdmin: costoServicio - pagoRepartidor,
-            usuarioAsignado: usuarioAsignado ? parseInt(usuarioAsignado) : null,
-            estado: usuarioAsignado ? 'asignado' : 'pendiente'
-        });
-        
-        hideForm('pedido');
-        document.getElementById('descripcion').value = '';
-        document.getElementById('clienteOrigen').value = '';
-        document.getElementById('origenManual').value = '';
-        document.getElementById('destino').value = '';
-        document.getElementById('costoServicio').value = '';
-        document.getElementById('pagoRepartidor').value = '';
-        document.getElementById('usuarioAsignado').value = '';
-        
-        await cargarPedidos();
-        await cargarUsuarios();
-        alert('✅ Pedido creado exitosamente.');
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al crear pedido');
-    }
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    
+    await f.crearPedidoConPushup({
+        descripcion, origen, destino, costoServicio, pagoRepartidor,
+        gananciaAdmin: costoServicio - pagoRepartidor,
+        usuarioAsignado: usuarioAsignado ? parseInt(usuarioAsignado) : null,
+        estado: usuarioAsignado ? 'asignado' : 'pendiente'
+    });
+    
+    hideForm('pedido');
+    ['descripcion','origenManual','destino','costoServicio','pagoRepartidor'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('clienteOrigen').value = '';
+    document.getElementById('usuarioAsignado').value = '';
+    await cargarPedidos();
+    alert('✅ Pedido creado');
 }
 
 async function asignarPedido(id) {
-    const usuariosActivos = usuariosCache.filter(u => u.activo && u.disponible);
-    if (usuariosActivos.length === 0) {
-        alert('No hay repartidores disponibles');
-        return;
-    }
-    const lista = usuariosActivos.map((u, i) => `${i+1}. ${u.nombre} (${u.vehiculo})`).join('\n');
-    const seleccion = prompt(`Selecciona un repartidor:\n${lista}\n\nIngresa el número:`);
-    if (!seleccion) return;
-    const index = parseInt(seleccion) - 1;
-    if (index < 0 || index >= usuariosActivos.length) {
-        alert('Selección inválida');
-        return;
-    }
-    const pedido = pedidosCache.find(p => p.id === id);
-    if (pedido) {
-        const fb = window.getFirebase();
-        if (!fb) { alert('Error de conexión con Firebase'); return; }
-        await fb.setPedido(id, { ...pedido, usuarioAsignado: usuariosActivos[index].id, estado: 'asignado' });
-        await cargarPedidos();
-    }
+    const activos = usuariosCache.filter(u => u.activo && u.disponible);
+    if (activos.length === 0) { alert('No hay repartidores disponibles'); return; }
+    const lista = activos.map((u, i) => `${i+1}. ${u.nombre} (${u.vehiculo})`).join('\n');
+    const sel = prompt(`Selecciona repartidor:\n${lista}\n\nNúmero:`);
+    if (!sel) return;
+    const idx = parseInt(sel) - 1;
+    if (idx < 0 || idx >= activos.length) { alert('Selección inválida'); return; }
+    const p = pedidosCache.find(p => p.id === id);
+    if (!p) return;
+    const f = fb();
+    if (!f) return;
+    await f.setPedido(id, { ...p, usuarioAsignado: activos[idx].id, estado: 'asignado' });
+    await cargarPedidos();
 }
 
 async function completarPedido(id) {
-    if (!confirm('¿Completar este pedido?')) return;
-    const pedido = pedidosCache.find(p => p.id === id);
-    if (!pedido) return;
-    
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    
-    await fb.setPedido(id, { ...pedido, estado: 'completado', fechaCompletado: new Date().toISOString() });
-    if (pedido.usuarioAsignado) {
-        const usuario = usuariosCache.find(u => u.id === pedido.usuarioAsignado);
-        if (usuario) {
-            await fb.setUsuario(usuario.id, {
-                ...usuario,
-                liquidacionTotal: (usuario.liquidacionTotal || 0) + pedido.pagoRepartidor,
-                pedidosCompletados: (usuario.pedidosCompletados || 0) + 1
-            });
+    if (!confirm('¿Completar pedido?')) return;
+    const p = pedidosCache.find(p => p.id === id);
+    if (!p) return;
+    const f = fb();
+    if (!f) return;
+    await f.setPedido(id, { ...p, estado: 'completado', fechaCompletado: new Date().toISOString() });
+    if (p.usuarioAsignado) {
+        const u = usuariosCache.find(u => u.id === p.usuarioAsignado);
+        if (u) {
+            await f.setUsuario(u.id, { ...u, liquidacionTotal: (u.liquidacionTotal || 0) + p.pagoRepartidor, pedidosCompletados: (u.pedidosCompletados || 0) + 1 });
         }
     }
-    liquidacionAdmin.total = (liquidacionAdmin.total || 0) + (pedido.gananciaAdmin || pedido.costoServicio - pedido.pagoRepartidor);
-    await fb.setLiquidacionAdmin(liquidacionAdmin);
-    const totalAdmin = document.getElementById('totalAdmin');
-    if (totalAdmin) totalAdmin.textContent = `$${liquidacionAdmin.total || 0}`;
+    liquidacionAdmin.total = (liquidacionAdmin.total || 0) + (p.gananciaAdmin || p.costoServicio - p.pagoRepartidor);
+    await f.setLiquidacionAdmin(liquidacionAdmin);
+    document.getElementById('totalAdmin').textContent = '$' + (liquidacionAdmin.total || 0);
     await cargarPedidos();
-    await cargarUsuarios();
 }
 
 async function eliminarPedido(id) {
-    if (!confirm('¿Eliminar este pedido?')) return;
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    await fb.deletePedido(id);
+    if (!confirm('¿Eliminar pedido?')) return;
+    const f = fb();
+    if (!f) return;
+    await f.deletePedido(id);
     await cargarPedidos();
 }
 
@@ -586,26 +442,26 @@ async function eliminarPedido(id) {
 // ===== LIQUIDACIONES =====
 // ============================================================
 
-async function verLiquidacionUsuario(id) {
-    const usuario = usuariosCache.find(u => u.id === id);
-    if (!usuario) return;
-    alert(`💰 Liquidación de ${usuario.nombre}\nTotal: $${usuario.liquidacionTotal || 0}\nPedidos: ${usuario.pedidosCompletados || 0}`);
+async function verLiquidacion(id) {
+    const u = usuariosCache.find(u => u.id === id);
+    if (!u) return;
+    alert(`💰 ${u.nombre}\nTotal: $${u.liquidacionTotal || 0}\nPedidos: ${u.pedidosCompletados || 0}`);
 }
 
 async function ajustarLiquidacion(id) {
-    const usuario = usuariosCache.find(u => u.id === id);
-    if (!usuario) return;
-    const concepto = prompt('Concepto (ej: Bono, Descuento, etc.):');
+    const u = usuariosCache.find(u => u.id === id);
+    if (!u) return;
+    const concepto = prompt('Concepto:');
     if (!concepto) return;
-    const monto = parseFloat(prompt('Monto (positivo o negativo):'));
+    const monto = parseFloat(prompt('Monto (+ o -):'));
     if (isNaN(monto) || monto === 0) return;
-    const ajustes = usuario.ajustesLiquidacion || [];
-    ajustes.push({ id: Date.now(), fecha: new Date().toISOString(), concepto, monto, tipo: monto > 0 ? 'extra' : 'descuento' });
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    await fb.setUsuario(id, { ...usuario, ajustesLiquidacion: ajustes, liquidacionTotal: (usuario.liquidacionTotal || 0) + monto });
+    const ajustes = u.ajustesLiquidacion || [];
+    ajustes.push({ id: Date.now(), fecha: new Date().toISOString(), concepto, monto });
+    const f = fb();
+    if (!f) return;
+    await f.setUsuario(id, { ...u, ajustesLiquidacion: ajustes, liquidacionTotal: (u.liquidacionTotal || 0) + monto });
     await cargarUsuarios();
-    alert('✅ Ajuste aplicado correctamente');
+    alert('✅ Ajuste aplicado');
 }
 
 // ============================================================
@@ -613,18 +469,12 @@ async function ajustarLiquidacion(id) {
 // ============================================================
 
 async function cargarPanelUsuario(usuario) {
-    const bienvenida = document.getElementById('bienvenidaUsuario');
-    if (bienvenida) bienvenida.textContent = `👋 Hola, ${usuario.nombre}`;
-    
-    const vehiculo = document.getElementById('vehiculoUsuario');
-    if (vehiculo) vehiculo.textContent = getVehiculoIcon(usuario.vehiculo);
-    
-    const liquidacion = document.getElementById('liquidacionUsuario');
-    if (liquidacion) liquidacion.textContent = `$${usuario.liquidacionTotal || 0}`;
-    
-    actualizarEstadoUsuario(usuario);
+    document.getElementById('bienvenidaUsuario').textContent = '👋 Hola, ' + usuario.nombre;
+    document.getElementById('vehiculoUsuario').textContent = getVehiculoIcon(usuario.vehiculo);
+    document.getElementById('liquidacionUsuario').textContent = '$' + (usuario.liquidacionTotal || 0);
+    actualizarEstado(usuario);
     await cargarPedidosUsuario(usuario.id);
-    iniciarEscuchaPushup();
+    iniciarEscucha();
 }
 
 function getVehiculoIcon(v) {
@@ -632,84 +482,69 @@ function getVehiculoIcon(v) {
     return icons[v] || v;
 }
 
-function actualizarEstadoUsuario(usuario) {
-    const estadoSpan = document.getElementById('estadoUsuario');
+function actualizarEstado(usuario) {
+    const es = document.getElementById('estadoUsuario');
     const btn = document.getElementById('btnDisponibilidad');
-    if (!estadoSpan || !btn) return;
+    if (!es || !btn) return;
     if (usuario.activo && usuario.disponible) {
-        estadoSpan.textContent = '✅ Activo';
-        estadoSpan.className = 'badge-active';
-        btn.textContent = '🟢 Disponible';
-        btn.className = 'btn-success';
-        btn.disabled = false;
+        es.textContent = '✅ Activo'; es.className = 'badge-active';
+        btn.textContent = '🟢 Disponible'; btn.className = 'btn-success'; btn.disabled = false;
     } else if (usuario.activo && !usuario.disponible) {
-        estadoSpan.textContent = '⏸️ Pausado';
-        estadoSpan.className = 'badge-inactive';
-        btn.textContent = '⏸️ No disponible';
-        btn.className = 'btn-secondary';
-        btn.disabled = false;
+        es.textContent = '⏸️ Pausado'; es.className = 'badge-inactive';
+        btn.textContent = '⏸️ No disponible'; btn.className = 'btn-secondary'; btn.disabled = false;
     } else {
-        estadoSpan.textContent = '❌ Inactivo';
-        estadoSpan.className = 'badge-inactive';
-        btn.textContent = '🚫 Inactivo';
-        btn.className = 'btn-danger';
-        btn.disabled = true;
+        es.textContent = '❌ Inactivo'; es.className = 'badge-inactive';
+        btn.textContent = '🚫 Inactivo'; btn.className = 'btn-danger'; btn.disabled = true;
     }
 }
 
 async function toggleDisponibilidad() {
     if (!usuarioActual) return;
-    const nuevoEstado = !usuarioActual.disponible;
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    await fb.setUsuario(usuarioActual.id, { ...usuarioActual, disponible: nuevoEstado });
-    usuarioActual.disponible = nuevoEstado;
+    const nuevo = !usuarioActual.disponible;
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    await f.setUsuario(usuarioActual.id, { ...usuarioActual, disponible: nuevo });
+    usuarioActual.disponible = nuevo;
     window.usuarioActual = usuarioActual;
     guardarSesionUsuario(usuarioActual);
-    actualizarEstadoUsuario(usuarioActual);
+    actualizarEstado(usuarioActual);
     await cargarPedidosUsuario(usuarioActual.id);
 }
 
 async function cargarPedidosUsuario(usuarioId) {
-    try {
-        const fb = window.getFirebase();
-        if (!fb) return;
-        const pedidos = await fb.getPedidos();
-        renderPedidosUsuario(pedidos, usuarioId);
-    } catch (error) {
-        console.error('Error cargando pedidos usuario:', error);
-    }
+    const f = fb();
+    if (!f) return;
+    const pedidos = await f.getPedidos();
+    renderPedidosUsuario(pedidos, usuarioId);
 }
 
 function renderPedidosUsuario(pedidos, usuarioId) {
     const pendientes = pedidos.filter(p => p.estado === 'pendiente');
-    const containerPendientes = document.getElementById('pedidosPendientes');
-    if (containerPendientes) {
-        containerPendientes.innerHTML = pendientes.length === 0 ? 
-            '<p>No hay pedidos disponibles</p>' :
+    const el = document.getElementById('pedidosPendientes');
+    if (el) {
+        el.innerHTML = pendientes.length === 0 ? '<p>No hay pedidos disponibles</p>' :
             pendientes.map(p => `
                 <div class="card">
                     <h4>📦 ${p.descripcion}</h4>
                     <p>📍 ${p.origen || 'Sin origen'} → ${p.destino || 'Sin destino'}</p>
                     <p>💰 Pago: $${p.pagoRepartidor || 0}</p>
                     <div class="card-actions">
-                        <button onclick="tomarPedido(${p.id})" class="btn-success">✅ Tomar Pedido</button>
+                        <button onclick="tomarPedido(${p.id})" class="btn-success">✅ Tomar</button>
                     </div>
                 </div>
             `).join('');
     }
     
-    const misPedidos = pedidos.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'asignado');
-    const containerMisPedidos = document.getElementById('misPedidos');
-    if (containerMisPedidos) {
-        containerMisPedidos.innerHTML = misPedidos.length === 0 ?
-            '<p>No tienes pedidos asignados</p>' :
-            misPedidos.map(p => `
+    const mis = pedidos.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'asignado');
+    const el2 = document.getElementById('misPedidos');
+    if (el2) {
+        el2.innerHTML = mis.length === 0 ? '<p>No tienes pedidos asignados</p>' :
+            mis.map(p => `
                 <div class="card">
                     <h4>📦 ${p.descripcion}</h4>
                     <p>📍 ${p.origen} → ${p.destino}</p>
                     <p>💰 Pago: $${p.pagoRepartidor}</p>
-                    <p>Estado: <span class="badge badge-asignado">ASIGNADO</span></p>
+                    <span class="badge badge-asignado">ASIGNADO</span>
                     <div class="card-actions">
                         <button onclick="completarPedidoUsuario(${p.id})" class="btn-success">✅ Completar</button>
                     </div>
@@ -717,17 +552,16 @@ function renderPedidosUsuario(pedidos, usuarioId) {
             `).join('');
     }
     
-    const historial = pedidos.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'completado');
-    const containerHistorial = document.getElementById('historialPedidos');
-    if (containerHistorial) {
-        containerHistorial.innerHTML = historial.length === 0 ?
-            '<p>No hay pedidos completados</p>' :
-            historial.map(p => `
+    const hist = pedidos.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'completado');
+    const el3 = document.getElementById('historialPedidos');
+    if (el3) {
+        el3.innerHTML = hist.length === 0 ? '<p>No hay pedidos completados</p>' :
+            hist.map(p => `
                 <div class="card">
                     <h4>📦 ${p.descripcion}</h4>
                     <p>📍 ${p.origen} → ${p.destino}</p>
                     <p>💰 Pago: $${p.pagoRepartidor}</p>
-                    <p>✅ Entregado: ${p.fechaCompletado ? new Date(p.fechaCompletado).toLocaleString() : 'Sin fecha'}</p>
+                    <p>✅ ${p.fechaCompletado ? new Date(p.fechaCompletado).toLocaleString() : 'Sin fecha'}</p>
                 </div>
             `).join('');
     }
@@ -735,188 +569,87 @@ function renderPedidosUsuario(pedidos, usuarioId) {
 
 async function tomarPedido(id) {
     if (!usuarioActual || !usuarioActual.disponible) {
-        alert('No estás disponible para tomar pedidos');
+        alert('No estás disponible');
         return;
     }
     if (!confirm('¿Tomar este pedido?')) return;
-    const pedido = pedidosCache.find(p => p.id === id);
-    if (pedido) {
-        const fb = window.getFirebase();
-        if (!fb) { alert('Error de conexión con Firebase'); return; }
-        await fb.setPedido(id, { ...pedido, usuarioAsignado: usuarioActual.id, estado: 'asignado' });
-        await cargarPedidosUsuario(usuarioActual.id);
-    }
+    const p = pedidosCache.find(p => p.id === id);
+    if (!p) return;
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    await f.setPedido(id, { ...p, usuarioAsignado: usuarioActual.id, estado: 'asignado' });
+    await cargarPedidosUsuario(usuarioActual.id);
 }
 
 async function completarPedidoUsuario(id) {
-    if (!confirm('¿Completar este pedido?')) return;
-    const fb = window.getFirebase();
-    if (!fb) { alert('Error de conexión con Firebase'); return; }
-    
-    const pedido = (await fb.getPedidos()).find(p => p.id === id);
-    if (!pedido) { alert('Pedido no encontrado'); return; }
-    await fb.setPedido(id, { ...pedido, estado: 'completado', fechaCompletado: new Date().toISOString() });
+    if (!confirm('¿Completar pedido?')) return;
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    const pedidos = await f.getPedidos();
+    const p = pedidos.find(p => p.id === id);
+    if (!p) { alert('Pedido no encontrado'); return; }
+    await f.setPedido(id, { ...p, estado: 'completado', fechaCompletado: new Date().toISOString() });
     if (usuarioActual) {
-        const nuevaLiquidacion = (usuarioActual.liquidacionTotal || 0) + pedido.pagoRepartidor;
-        await fb.setUsuario(usuarioActual.id, {
-            ...usuarioActual,
-            liquidacionTotal: nuevaLiquidacion,
-            pedidosCompletados: (usuarioActual.pedidosCompletados || 0) + 1
-        });
-        usuarioActual.liquidacionTotal = nuevaLiquidacion;
+        const nuevoTotal = (usuarioActual.liquidacionTotal || 0) + p.pagoRepartidor;
+        await f.setUsuario(usuarioActual.id, { ...usuarioActual, liquidacionTotal: nuevoTotal, pedidosCompletados: (usuarioActual.pedidosCompletados || 0) + 1 });
+        usuarioActual.liquidacionTotal = nuevoTotal;
         usuarioActual.pedidosCompletados = (usuarioActual.pedidosCompletados || 0) + 1;
-        window.usuarioActual = usuarioActual;
-        const liquidacionSpan = document.getElementById('liquidacionUsuario');
-        if (liquidacionSpan) liquidacionSpan.textContent = `$${nuevaLiquidacion}`;
+        document.getElementById('liquidacionUsuario').textContent = '$' + nuevoTotal;
         guardarSesionUsuario(usuarioActual);
     }
-    const ganancia = pedido.gananciaAdmin || (pedido.costoServicio - pedido.pagoRepartidor);
+    const ganancia = p.gananciaAdmin || p.costoServicio - p.pagoRepartidor;
     liquidacionAdmin.total = (liquidacionAdmin.total || 0) + ganancia;
-    await fb.setLiquidacionAdmin(liquidacionAdmin);
+    await f.setLiquidacionAdmin(liquidacionAdmin);
     await cargarPedidosUsuario(usuarioActual.id);
-    alert('✅ Pedido completado exitosamente');
+    alert('✅ Pedido completado');
 }
 
 // ============================================================
-// ===== PUSHUP - NOTIFICACIONES MEJORADAS =====
+// ===== NOTIFICACIONES PUSH =====
 // ============================================================
 
-let ultimaNotificacionId = null;
-let timeoutNotificacion = null;
-
-function mostrarAlertaPedidoNuevoMejorado(pedido) {
-    const fb = window.getFirebase();
-    if (fb && fb.reproducirSonidoNotificacion) {
-        fb.reproducirSonidoNotificacion();
-        setTimeout(() => {
-            if (fb.reproducirSonidoNotificacion) fb.reproducirSonidoNotificacion();
-        }, 400);
-    }
-    
-    if (ultimaNotificacionId === pedido.id) {
-        console.log('⏭️ Notificación duplicada ignorada');
-        return;
-    }
-    ultimaNotificacionId = pedido.id;
-    
-    if (timeoutNotificacion) {
-        clearTimeout(timeoutNotificacion);
-        timeoutNotificacion = null;
-    }
-    
-    const alertaAnterior = document.querySelector('.alerta-pedido-nuevo');
-    if (alertaAnterior) alertaAnterior.remove();
-    
-    const alerta = document.createElement('div');
-    alerta.className = 'alerta-pedido-nuevo';
-    alerta.style.cssText = `
-        background: linear-gradient(135deg, #1a3a1a, #0a2a0a);
-        border: 2px solid #28a745;
-        border-radius: 12px;
-        padding: 15px 20px;
-        margin-bottom: 20px;
-        animation: alertaEntrada 0.5s ease-out;
-        box-shadow: 0 0 30px rgba(40, 167, 69, 0.2);
-        position: relative;
-        z-index: 100;
-    `;
-    
-    alerta.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 2.5rem; animation: iconoPulso 0.8s ease-in-out infinite;">📦</span>
-            <div style="flex: 1;">
-                <strong style="color: #28a745; font-size: 1.2rem;">¡Nuevo Pedido Disponible!</strong>
-                <p style="margin: 3px 0; color: #b0b0b0;">${pedido.descripcion || 'Sin descripción'}</p>
-                <p style="font-size: 0.9rem; opacity: 0.8; margin: 0;">📍 ${pedido.origen || 'Sin origen'} → ${pedido.destino || 'Sin destino'}</p>
-                <p style="font-size: 0.9rem; color: #28a745; margin: 0;">💰 $${pedido.pagoRepartidor || 0}</p>
-            </div>
-            <button onclick="this.parentElement.parentElement.remove()" style="padding: 4px 12px; background: #dc3545; color: white; border: none; border-radius: 6px; cursor: pointer;">✕</button>
-        </div>
-    `;
-    
-    const panel = document.getElementById('usuarioPanel');
-    if (panel) {
-        panel.insertBefore(alerta, panel.firstChild);
-    }
-    
-    timeoutNotificacion = setTimeout(() => {
-        if (alerta.parentNode) alerta.remove();
-        timeoutNotificacion = null;
-    }, 15000);
-}
-
-function iniciarEscuchaPushup() {
-    const fb = window.getFirebase();
-    if (!fb) {
-        console.error('❌ Firebase no disponible para pushup');
-        setTimeout(iniciarEscuchaPushup, 2000);
-        return;
-    }
-    
-    console.log('📡 Iniciando escucha de nuevos pedidos (keepSynced activado)...');
-    activarSonidoGlobal();
-    
-    fb.escucharNuevosPedidos(function(nuevoPedido) {
-        console.log(`📦 Nuevo pedido #${nuevoPedido.id} detectado:`, nuevoPedido.descripcion);
-        
-        if (ultimoPedidoPendiente === null || nuevoPedido.id !== ultimoPedidoPendiente.id) {
-            ultimoPedidoPendiente = nuevoPedido;
+function iniciarEscucha() {
+    const f = fb();
+    if (!f) { setTimeout(iniciarEscucha, 2000); return; }
+    console.log('📡 Escuchando pedidos...');
+    f.escucharNuevosPedidos(function(nuevo) {
+        if (ultimoPedidoPendiente === null || nuevo.id !== ultimoPedidoPendiente.id) {
+            ultimoPedidoPendiente = nuevo;
+            if (f.reproducirSonido) f.reproducirSonido();
             
-            if (fb.reproducirSonidoNotificacion) {
-                fb.reproducirSonidoNotificacion();
-                setTimeout(() => {
-                    if (fb.reproducirSonidoNotificacion) fb.reproducirSonidoNotificacion();
-                }, 400);
-            }
+            // Alerta visual
+            const alerta = document.createElement('div');
+            alerta.className = 'alerta-pedido-nuevo';
+            alerta.style.cssText = 'background:linear-gradient(135deg,#1a3a1a,#0a2a0a);border:2px solid #28a745;border-radius:12px;padding:15px;margin-bottom:20px;';
+            alerta.innerHTML = `
+                <div style="display:flex;align-items:center;gap:15px;">
+                    <span style="font-size:2.5rem;">📦</span>
+                    <div style="flex:1;">
+                        <strong style="color:#28a745;">¡Nuevo Pedido!</strong>
+                        <p style="margin:3px 0;color:#b0b0b0;">${nuevo.descripcion}</p>
+                        <p style="font-size:0.9rem;color:#b0b0b0;">📍 ${nuevo.origen} → ${nuevo.destino}</p>
+                        <p style="color:#28a745;">💰 $${nuevo.pagoRepartidor}</p>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:4px 12px;cursor:pointer;">✕</button>
+                </div>
+            `;
+            const panel = document.getElementById('usuarioPanel');
+            if (panel) panel.insertBefore(alerta, panel.firstChild);
+            setTimeout(() => { if (alerta.parentNode) alerta.remove(); }, 15000);
             
-            if ('Notification' in window && Notification.permission === 'granted') {
-                try {
-                    new Notification('📦 Nuevo Pedido Disponible', {
-                        body: `${nuevoPedido.descripcion || 'Pedido'}\n📍 ${nuevoPedido.origen || ''} → ${nuevoPedido.destino || ''}\n💰 $${nuevoPedido.pagoRepartidor || 0}`,
-                        icon: 'data:image/svg+xml,' + encodeURIComponent(`
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-                                <rect width="100" height="100" rx="20" fill="#ff6b35"/>
-                                <text x="50" y="70" font-size="60" text-anchor="middle">📦</text>
-                            </svg>
-                        `),
-                        silent: false,
-                        vibrate: [200, 100, 200],
-                        requireInteraction: true,
-                        tag: 'nuevo-pedido-' + nuevoPedido.id
-                    });
-                } catch (e) {
-                    console.log('Error mostrando notificación:', e);
-                }
-            }
-            
-            mostrarAlertaPedidoNuevoMejorado(nuevoPedido);
-            
-            if (usuarioActual) {
-                console.log('🔄 Recargando lista de pedidos...');
-                cargarPedidosUsuario(usuarioActual.id);
-            }
+            if (usuarioActual) cargarPedidosUsuario(usuarioActual.id);
         }
     });
 }
 
-// ============================================================
-// ===== ACTIVAR SONIDO MANUAL =====
-// ============================================================
-
 function activarSonidoManual() {
-    const fb = window.getFirebase();
-    if (fb && fb.activarSonido) {
-        fb.activarSonido();
-        if (fb.reproducirSonidoNotificacion) {
-            fb.reproducirSonidoNotificacion();
-            setTimeout(() => {
-                if (fb.reproducirSonidoNotificacion) fb.reproducirSonidoNotificacion();
-            }, 300);
-        }
-        alert('🔊 Sonido activado. Ahora escucharás las notificaciones.');
-        console.log('🔊 Sonido activado manualmente');
+    const f = fb();
+    if (f && f.activarSonido) {
+        f.activarSonido();
+        if (f.reproducirSonido) f.reproducirSonido();
+        alert('🔊 Sonido activado');
     } else {
-        alert('⚠️ Error activando sonido. Intenta tocar la pantalla primero.');
+        alert('⚠️ Error al activar sonido');
     }
 }
 
@@ -927,27 +660,16 @@ function activarSonidoManual() {
 function showTab(tab) {
     document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    
-    if (tab === 'usuarios') {
-        document.getElementById('tabUsuarios').style.display = 'block';
-        document.querySelector('.tab-btn:first-child').classList.add('active');
-        cargarUsuarios();
-    } else if (tab === 'pedidos') {
-        document.getElementById('tabPedidos').style.display = 'block';
-        document.querySelectorAll('.tab-btn')[1].classList.add('active');
-        cargarPedidos();
-    } else if (tab === 'liquidaciones') {
-        document.getElementById('tabLiquidaciones').style.display = 'block';
-        document.querySelectorAll('.tab-btn')[2].classList.add('active');
-        cargarLiquidaciones();
-    } else if (tab === 'admin') {
-        document.getElementById('tabAdmin').style.display = 'block';
-        document.querySelectorAll('.tab-btn')[3].classList.add('active');
-        cargarLiquidacionAdmin();
-    } else if (tab === 'clientes') {
-        document.getElementById('tabClientes').style.display = 'block';
-        document.querySelectorAll('.tab-btn')[4].classList.add('active');
-        cargarClientes();
+    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'admin'];
+    const idx = tabs.indexOf(tab);
+    if (idx >= 0) {
+        document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).style.display = 'block';
+        document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+        if (tab === 'usuarios') cargarUsuarios();
+        else if (tab === 'clientes') cargarClientes();
+        else if (tab === 'pedidos') cargarPedidos();
+        else if (tab === 'liquidaciones') cargarLiquidaciones();
+        else if (tab === 'admin') cargarLiquidacionAdmin();
     }
 }
 
@@ -970,23 +692,20 @@ function showUserTab(tab) {
 }
 
 async function cargarLiquidaciones() {
-    const fb = window.getFirebase();
-    if (!fb) return;
-    const usuarios = await fb.getUsuarios();
+    const f = fb();
+    if (!f) return;
+    const usuarios = await f.getUsuarios();
     const container = document.getElementById('liquidacionesList');
     if (!container) return;
-    
     container.innerHTML = usuarios.map(u => `
         <div class="card">
             <h4>${u.nombre}</h4>
             <p>🚗 ${u.vehiculo}</p>
-            <p>💰 Liquidación total: $${u.liquidacionTotal || 0}</p>
-            <p>📦 Pedidos completados: ${u.pedidosCompletados || 0}</p>
-            <span class="badge ${u.activo ? 'badge-active' : 'badge-inactive'}">
-                ${u.activo ? '✅ Activo' : '❌ Inactivo'}
-            </span>
+            <p>💰 $${u.liquidacionTotal || 0}</p>
+            <p>📦 ${u.pedidosCompletados || 0}</p>
+            <span class="badge ${u.activo ? 'badge-active' : 'badge-inactive'}">${u.activo ? '✅ Activo' : '❌ Inactivo'}</span>
             <div class="card-actions">
-                <button onclick="verLiquidacionUsuario(${u.id})" class="btn-primary">💰 Ver Detalle</button>
+                <button onclick="verLiquidacion(${u.id})" class="btn-primary">💰 Ver</button>
                 <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
             </div>
         </div>
@@ -994,48 +713,13 @@ async function cargarLiquidaciones() {
 }
 
 function showForm(tipo) {
-    if (tipo === 'usuario') {
-        document.getElementById('usuarioForm').style.display = 'block';
-    } else if (tipo === 'pedido') {
-        document.getElementById('pedidoForm').style.display = 'block';
-        cargarClientes();
-    } else if (tipo === 'cliente') {
-        document.getElementById('clienteForm').style.display = 'block';
-    }
+    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm' };
+    if (map[tipo]) document.getElementById(map[tipo]).style.display = 'block';
 }
 
 function hideForm(tipo) {
-    if (tipo === 'usuario') {
-        document.getElementById('usuarioForm').style.display = 'none';
-    } else if (tipo === 'pedido') {
-        document.getElementById('pedidoForm').style.display = 'none';
-    } else if (tipo === 'cliente') {
-        document.getElementById('clienteForm').style.display = 'none';
-    }
-}
-
-// ============================================================
-// ===== RECONEXIÓN AUTOMÁTICA =====
-// ============================================================
-
-function iniciarReconexion() {
-    const fb = window.getFirebase();
-    if (!fb) {
-        console.error('❌ Firebase no disponible para reconexión');
-        return;
-    }
-    
-    const dbRef = fb.database.ref('.info/connected');
-    dbRef.on('value', function(snap) {
-        if (snap.val() === true) {
-            console.log('✅ Reconectado a Firebase');
-            if (usuarioActual) {
-                cargarPedidosUsuario(usuarioActual.id);
-            }
-        } else {
-            console.log('⚠️ Desconectado de Firebase - Reintentando...');
-        }
-    });
+    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm' };
+    if (map[tipo]) document.getElementById(map[tipo]).style.display = 'none';
 }
 
 // ============================================================
@@ -1043,22 +727,17 @@ function iniciarReconexion() {
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚚 Gestor de Entregas v3.0 - Firebase');
+    console.log('🚚 Gestor de Entregas v3.0');
     console.log('Admin: LedZepp1');
-    console.log('Usuarios: carlos123 / reparto2024, maria456 / bici2024');
-    console.log('🔊 Sonido: Activado al tocar la pantalla');
+    console.log('Usuarios: carlos123, maria456, julio789');
     
-    // Activar sonido al cargar la página (intento)
-    setTimeout(function() {
-        activarSonidoGlobal();
-    }, 1000);
+    // Intentar activar sonido al cargar
+    setTimeout(activarSonidoGlobal, 1000);
     
     if (typeof window.firebaseFunctions === 'undefined') {
-        console.warn('⏳ Esperando carga de Firebase...');
-        const checkFirebase = setInterval(function() {
+        const check = setInterval(function() {
             if (typeof window.firebaseFunctions !== 'undefined') {
-                clearInterval(checkFirebase);
-                console.log('✅ Firebase cargado correctamente');
+                clearInterval(check);
                 iniciarSistema();
             }
         }, 500);
@@ -1084,5 +763,4 @@ function iniciarSistema() {
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
     }
-    iniciarReconexion();
 }

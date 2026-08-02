@@ -1387,6 +1387,12 @@ async function cargarVistaGps() {
 
     const markers = activos.map(u => {
         const marker = L.marker([u.ubicacion.lat, u.ubicacion.lng]).addTo(map);
+        marker.bindTooltip(`${u.nombre}`, {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -10],
+            className: 'gps-marker-label'
+        });
         marker.bindPopup(`
             <strong>${u.nombre}</strong><br>
             ${u.vehiculo}<br>

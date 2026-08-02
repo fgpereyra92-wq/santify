@@ -1,0 +1,21 @@
+*** Begin Patch
+*** Update File: usuarios.html
+@@
+-            const candidates = [
+-                'logos/logo.png',
+-                'logos/logo 4.png',
+-                'logos/logo 1.png',
+-                'logos/logo 2.jpg',
+-                'logos/logo 3.jpg',
+-                'logos/logo 5.png'
+-            ];
++            const candidates = [
++                'logo.png',
++                'logos/logo.png',
++                'logos/logo 4.png',
++                'logos/logo 1.png',
++                'logos/logo 2.jpg',
++                'logos/logo 3.jpg',
++                'logos/logo 5.png'
++            ];
+*** End Patch

@@ -65,6 +65,14 @@ function prepararAudio() {
     }
 }
 
+// Los navegadores móviles suspenden el AudioContext al bloquear la pantalla o
+// cambiar de app. Sin esto, el sonido puede quedar mudo hasta el próximo toque.
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && sonidoHabilitado && audioContext && audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+    }
+});
+
 // Cargar el archivo de sonido
 function obtenerAudio() {
     if (audioElement) return audioElement;
@@ -88,6 +96,11 @@ function reproducirSonido() {
     }
 
     try {
+        // Reanudar el contexto si el navegador lo suspendió (pantalla bloqueada, cambio de app, etc.)
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().catch(() => {});
+        }
+
         // Opción 1: AudioContext (tono sintético como respaldo)
         if (audioContext && audioContext.state === 'running') {
             const osc = audioContext.createOscillator();
@@ -122,7 +135,18 @@ function reproducirSonido() {
         if (audio) {
             audio.currentTime = 0;
             audio.volume = 0.8;
-            audio.play().catch(e => console.warn('⚠️ Error con MP3:', e.message));
+            audio.play().catch(e => {
+                console.warn('⚠️ Error con MP3, reintentando con un elemento nuevo:', e.message);
+                // Tras mucho tiempo en segundo plano algunos navegadores móviles
+                // invalidan el elemento de audio: se recrea y se reintenta una vez.
+                audioElement = null;
+                const retry = obtenerAudio();
+                if (retry) {
+                    retry.currentTime = 0;
+                    retry.volume = 0.8;
+                    retry.play().catch(e2 => console.warn('⚠️ Reintento de MP3 falló:', e2.message));
+                }
+            });
         }
 
         // Vibración (móviles)

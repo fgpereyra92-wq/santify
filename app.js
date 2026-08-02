@@ -1351,7 +1351,7 @@ async function cargarVistaGps() {
                 </thead>
                 <tbody>
                     ${activos.map(u => `
-                        <tr>
+                        <tr data-usuario-id="${u.id}" onclick="seleccionarUsuarioGPS(${u.id})">
                             <td>${u.nombre}</td>
                             <td>${u.vehiculo}</td>
                             <td>${u.ubicacion.lat.toFixed(4)}, ${u.ubicacion.lng.toFixed(4)}</td>
@@ -1366,13 +1366,64 @@ async function cargarVistaGps() {
 
     const mapa = `
         <div class="gps-map-card">
-            <div class="list-section-title">Vista mapa simple</div>
-            <iframe class="gps-map-frame" src="https://www.openstreetmap.org/export/embed.html?bbox=${(u => u ? u.ubicacion.lng - 0.02 : 0).toString()}%2C${(u => u ? u.ubicacion.lat - 0.02 : 0).toString()}%2C${(u => u ? u.ubicacion.lng + 0.02 : 0).toString()}%2C${(u => u ? u.ubicacion.lat + 0.02 : 0).toString()}&layer=mapnik"></iframe>
+            <div class="list-section-title">Mapa de repartidores</div>
+            <div id="gpsMap" class="gps-map-frame"></div>
+            <div id="gpsSelectedInfo" class="gps-selected-info">Seleccioná un repartidor en el mapa o en la tabla para revisarlo.</div>
         </div>
     `;
 
-    container.innerHTML = `${tabla}${mapa}`;
+    container.innerHTML = `<div class="gps-panel-grid">${tabla}${mapa}</div>`;
+
+    const map = L.map('gpsMap', {
+        center: [activos[0].ubicacion.lat, activos[0].ubicacion.lng],
+        zoom: 13,
+        zoomControl: true,
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+    }).addTo(map);
+
+    const markers = activos.map(u => {
+        const marker = L.marker([u.ubicacion.lat, u.ubicacion.lng]).addTo(map);
+        marker.bindPopup(`
+            <strong>${u.nombre}</strong><br>
+            ${u.vehiculo}<br>
+            ${u.ubicacion.lat.toFixed(5)}, ${u.ubicacion.lng.toFixed(5)}<br>
+            <button onclick="seleccionarUsuarioGPS(${u.id})" class="btn-success btn-sm">Seleccionar</button>
+        `);
+        marker.on('click', () => seleccionarUsuarioGPS(u.id));
+        return marker;
+    });
+
+    const group = L.featureGroup(markers);
+    if (markers.length > 0) {
+        map.fitBounds(group.getBounds().pad(0.2));
+    }
+
+    window.activosGPS = activos;
 }
+
+function seleccionarUsuarioGPS(id) {
+    const usuarios = window.activosGPS || [];
+    const usuario = usuarios.find(u => u.id === id);
+    if (!usuario) return;
+
+    document.querySelectorAll('.gps-table tr').forEach(row => row.classList.remove('gps-row-selected'));
+    const row = document.querySelector(`.gps-table tr[data-usuario-id='${id}']`);
+    if (row) row.classList.add('gps-row-selected');
+
+    const info = document.getElementById('gpsSelectedInfo');
+    if (info) {
+        info.innerHTML = `
+            <strong>${usuario.nombre}</strong> — ${usuario.vehiculo}<br>
+            Ubicación: ${usuario.ubicacion.lat.toFixed(5)}, ${usuario.ubicacion.lng.toFixed(5)}<br>
+            Estado: ${usuario.disponible ? 'Disponible' : 'No disponible'}
+        `;
+    }
+}
+
 
 function showForm(tipo) {
     const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm' };

@@ -12,6 +12,10 @@ let liquidacionAdmin = { total: 0, historial: [] };
 let ultimoPedidoPendiente = null;
 let geolocationWatchId = null;
 let geolocationActive = false;
+// Polling para actualización periódica cuando no hay escucha en tiempo real
+let adminPollingId = null;
+let userPollingId = null;
+let pollingIntervalMs = 7000; // intervalo por defecto (7s). Cambiar a 5000-10000 según prefieras
 
 // ============================================================
 // ===== HELPER PARA FIREBASE =====
@@ -71,7 +75,7 @@ function limpiarSesion() { sessionStorage.removeItem('admin'); sessionStorage.re
 // ===== LOGIN ADMIN =====
 // ============================================================
 
-function loginAdmin() {
+async function loginAdmin() {
     const pass = document.getElementById('adminPassword').value;
     if (pass === ADMIN_PASSWORD) {
         guardarSesionAdmin(true);
@@ -79,7 +83,8 @@ function loginAdmin() {
         const adminPanel = document.getElementById('adminPanel');
         if (loginSection) loginSection.style.display = 'none';
         if (adminPanel) adminPanel.style.display = 'block';
-        cargarDatosAdmin();
+        await cargarDatosAdmin();
+        iniciarPollingAdmin();
         document.getElementById('adminPassword').value = '';
         const errorEl = document.getElementById('loginError');
         if (errorEl) errorEl.textContent = '';
@@ -95,6 +100,7 @@ function logout() {
     detenerSeguimientoUbicacion();
     const f = fb();
     if (f) f.dejarDeEscuchar();
+    detenerTodosPolling();
     const loginSection = document.getElementById('loginSection');
     const adminPanel = document.getElementById('adminPanel');
     if (loginSection) loginSection.style.display = 'block';
@@ -132,6 +138,7 @@ async function loginUsuario() {
             
             if (errorEl) errorEl.textContent = '';
             await cargarPanelUsuario(usuario);
+            iniciarPollingUsuario(usuario.id);
         } else {
             if (errorEl) errorEl.textContent = '❌ Usuario o contraseña incorrectos';
         }
@@ -148,6 +155,7 @@ function logoutUsuario() {
     detenerSeguimientoUbicacion();
     const f = fb();
     if (f) f.dejarDeEscuchar();
+    detenerTodosPolling();
     
     const loginSection = document.getElementById('loginUsuarioSection');
     const panel = document.getElementById('usuarioPanel');
@@ -1179,6 +1187,54 @@ function iniciarEscucha() {
 }
 
 // ============================================================
+// ===== POLLING PERIÓDICO (FALLBACK) =====
+// ============================================================
+
+function iniciarPollingAdmin() {
+    if (adminPollingId !== null) return;
+    console.log('⏱️ Iniciando polling admin cada', pollingIntervalMs, 'ms');
+    adminPollingId = setInterval(() => {
+        const adminPanel = document.getElementById('adminPanel');
+        if (adminPanel && adminPanel.style.display !== 'none') {
+            cargarPedidos().catch(console.error);
+            cargarUsuarios().catch(console.error);
+            cargarClientes().catch(console.error);
+        }
+    }, pollingIntervalMs);
+}
+
+function detenerPollingAdmin() {
+    if (adminPollingId !== null) {
+        clearInterval(adminPollingId);
+        adminPollingId = null;
+        console.log('⏹️ Polling admin detenido');
+    }
+}
+
+function iniciarPollingUsuario(usuarioId) {
+    if (userPollingId !== null) return;
+    console.log('⏱️ Iniciando polling usuario cada', pollingIntervalMs, 'ms');
+    userPollingId = setInterval(() => {
+        if (usuarioActual && usuarioActual.id === usuarioId) {
+            cargarPedidosUsuario(usuarioId).catch(console.error);
+        }
+    }, pollingIntervalMs);
+}
+
+function detenerPollingUsuario() {
+    if (userPollingId !== null) {
+        clearInterval(userPollingId);
+        userPollingId = null;
+        console.log('⏹️ Polling usuario detenido');
+    }
+}
+
+function detenerTodosPolling() {
+    detenerPollingAdmin();
+    detenerPollingUsuario();
+}
+
+// ============================================================
 // ===== ACTIVAR SONIDO MANUAL (BOTÓN) =====
 // ============================================================
 
@@ -1359,6 +1415,7 @@ function iniciarSistema() {
         if (loginSection) loginSection.style.display = 'none';
         if (adminPanel) adminPanel.style.display = 'block';
         cargarDatosAdmin();
+        iniciarPollingAdmin();
     }
     const usuario = obtenerSesionUsuario();
     if (usuario) {
@@ -1369,6 +1426,7 @@ function iniciarSistema() {
         if (loginSection) loginSection.style.display = 'none';
         if (panel) panel.style.display = 'block';
         cargarPanelUsuario(usuario);
+        iniciarPollingUsuario(usuario.id);
     }
     if ('Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();

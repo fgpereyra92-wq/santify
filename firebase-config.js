@@ -197,6 +197,21 @@ function dejarDeEscuchar() {
     console.log('🔇 Dejó de escuchar pedidos');
 }
 
+// Escuchar cambios en el propio usuario (ej: liquidación pagada por el admin)
+function escucharUsuario(id, callback) {
+    database.ref('usuarios/' + id).on('value', function(snapshot) {
+        const data = snapshot.val();
+        if (data) callback({ id, ...data });
+    }, function(error) {
+        console.error('❌ Error escuchando usuario:', error);
+    });
+}
+
+function dejarDeEscucharUsuario(id) {
+    database.ref('usuarios/' + id).off();
+    console.log('🔇 Dejó de escuchar usuario ' + id);
+}
+
 // ============================================================
 // 📦 CRUD — USUARIOS
 // ============================================================
@@ -347,6 +362,8 @@ async function crearPedidoConPushup(data) {
 window.firebaseFunctions = {
     escucharNuevosPedidos,
     dejarDeEscuchar,
+    escucharUsuario,
+    dejarDeEscucharUsuario,
     getUsuarios,
     setUsuario,
     deleteUsuario,

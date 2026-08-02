@@ -149,12 +149,14 @@ async function loginUsuario() {
 }
 
 function logoutUsuario() {
+    const idPrevio = usuarioActual ? usuarioActual.id : null;
     usuarioActual = null;
     window.usuarioActual = null;
     limpiarSesion();
     detenerSeguimientoUbicacion();
     const f = fb();
     if (f) f.dejarDeEscuchar();
+    if (f && idPrevio !== null && f.dejarDeEscucharUsuario) f.dejarDeEscucharUsuario(idPrevio);
     detenerTodosPolling();
     
     const loginSection = document.getElementById('loginUsuarioSection');
@@ -169,6 +171,8 @@ function logoutUsuario() {
 
 async function cargarDatosAdmin() {
     try {
+        const f = fb();
+        if (f) pedidosCache = await f.getPedidos(); // precargar para que los totales de liquidación salgan bien en el primer render
         await cargarUsuarios();
         await cargarPedidos();
         await cargarClientes();
@@ -245,8 +249,7 @@ function renderUsuarios(usuarios) {
                 const calificacion = u.calificacion ? `${'★'.repeat(u.calificacion)} (${u.calificacion}/5)` : 'Sin calificación';
                 const ubicacion = u.ubicacion ? `${u.ubicacion.lat.toFixed(4)}, ${u.ubicacion.lng.toFixed(4)}` : 'Sin GPS';
                 const gpsStatus = u.gpsActiva ? '🛰️ GPS activo' : '⚠️ GPS inactivo';
-                const ajustes = u.ajustesLiquidacion || [];
-                const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
+                const { pedidosActivos, ajustes, totalAjustes, totalGeneral } = calcularLiquidacion(u.id, pedidosCache, u.ajustesLiquidacion);
                 const ajustesLabel = ajustes.length > 0 ? `✏️ Ajustes: ${ajustes.length} · ${totalAjustes > 0 ? '+' : ''}$${totalAjustes}` : '✏️ Sin ajustes';
                 return `
                     <div class="list-row">
@@ -256,7 +259,7 @@ function renderUsuarios(usuarios) {
                                 <strong>${u.nombre}</strong>
                                 <div>👤 @${u.username}</div>
                                 <div>🚗 ${u.vehiculo}</div>
-                                <div>💰 $${u.liquidacionTotal || 0} · 📦 ${u.pedidosCompletados || 0}</div>
+                                <div>💰 $${totalGeneral} · 📦 ${pedidosActivos.length}</div>
                                 <div>${ajustesLabel}</div>
                                 <div>⭐ ${calificacion}</div>
                                 <div>📍 ${ubicacion}</div>
@@ -295,9 +298,11 @@ function renderClientes(clientes) {
                         <strong>${c.nombre}</strong>
                         <div>📍 ${c.direccion || 'Sin dirección'}</div>
                         <div>📞 ${c.telefono || 'Sin teléfono'}</div>
+                        ${c.referencia ? `<div>📝 ${c.referencia}</div>` : ''}
                         <div class="badge ${c.activo ? 'badge-active' : 'badge-inactive'}">${c.activo ? '✅ Activo' : '❌ Inactivo'}</div>
                     </div>
                     <div class="list-row-actions">
+                        <button onclick="editarCliente(${c.id})" class="btn-secondary">✏️ Editar</button>
                         <button onclick="toggleClienteActivo(${c.id})" class="${c.activo ? 'btn-danger' : 'btn-success'}">${c.activo ? 'Desactivar' : 'Activar'}</button>
                         <button onclick="eliminarCliente(${c.id})" class="btn-danger">Eliminar</button>
                     </div>
@@ -355,6 +360,20 @@ function renderPedidosAdmin(pedidos) {
 // ===== LIQUIDACIONES — INTERFAZ COMPLETA =====
 // ============================================================
 
+// Fuente de verdad del monto a liquidar: siempre se calcula en vivo a partir
+// de los pedidos reales (no del contador liquidacionTotal, que puede
+// desincronizarse si se completan pedidos muy seguidos).
+function calcularLiquidacion(usuarioId, pedidosLista, ajustesLista) {
+    const completados = pedidosLista.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'completado');
+    const pedidosActivos = completados.filter(p => !p.liquidado);
+    const pedidosHistorial = completados.filter(p => p.liquidado)
+        .sort((a, b) => new Date(b.liquidacionFecha || 0) - new Date(a.liquidacionFecha || 0));
+    const totalPedidos = pedidosActivos.reduce((sum, p) => sum + (p.pagoRepartidor || 0), 0);
+    const ajustes = ajustesLista || [];
+    const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
+    return { pedidosActivos, pedidosHistorial, ajustes, totalPedidos, totalAjustes, totalGeneral: totalPedidos + totalAjustes };
+}
+
 async function verLiquidacionDetalle(id) {
     const u = usuariosCache.find(u => u.id === id);
     if (!u) {
@@ -366,13 +385,8 @@ async function verLiquidacionDetalle(id) {
     if (!f) { alert('Error de conexión'); return; }
     
     const pedidos = await f.getPedidos();
-    const pedidosCompletados = pedidos.filter(p => p.usuarioAsignado === id && p.estado === 'completado');
-    
-    // Calcular totales
-    const totalPedidos = pedidosCompletados.reduce((sum, p) => sum + (p.pagoRepartidor || 0), 0);
-    const ajustes = u.ajustesLiquidacion || [];
-    const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
-    const totalGeneral = totalPedidos + totalAjustes;
+    const { pedidosActivos, pedidosHistorial, ajustes, totalPedidos, totalAjustes, totalGeneral } =
+        calcularLiquidacion(id, pedidos, u.ajustesLiquidacion);
     
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -394,9 +408,9 @@ async function verLiquidacionDetalle(id) {
                 <p style="font-size:1.2rem;"><strong>TOTAL A PAGAR:</strong> <span style="color:#28a745;font-size:1.5rem;">$${totalGeneral}</span></p>
             </div>
             
-            <!-- Pedidos completados -->
-            <h4 style="color:#ff6b35;margin-bottom:10px;">📦 Pedidos Completados (${pedidosCompletados.length})</h4>
-            ${pedidosCompletados.length === 0 ? '<p style="color:#888;">No hay pedidos completados</p>' : `
+            <!-- Pedidos activos (no liquidados) -->
+            <h4 style="color:#ff6b35;margin-bottom:10px;">📦 Pedidos a liquidar (${pedidosActivos.length})</h4>
+            ${pedidosActivos.length === 0 ? '<p style="color:#888;">No hay pedidos pendientes de liquidar</p>' : `
                 <div style="max-height:250px;overflow-y:auto;margin-bottom:20px;">
                     <table style="width:100%;border-collapse:collapse;color:#b0b0b0;">
                         <thead>
@@ -409,7 +423,7 @@ async function verLiquidacionDetalle(id) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${pedidosCompletados.map((p, i) => `
+                            ${pedidosActivos.map((p, i) => `
                                 <tr style="border-bottom:1px solid #2a2a2a;">
                                     <td style="padding:8px;">${i + 1}</td>
                                     <td style="padding:8px;">${p.descripcion}</td>
@@ -440,7 +454,35 @@ async function verLiquidacionDetalle(id) {
                     `).join('')}
                 </div>
             ` : ''}
-            
+
+            <!-- Historial (ya liquidado) -->
+            ${pedidosHistorial.length > 0 ? `
+                <div class="list-divider"></div>
+                <h4 style="color:#888;margin-bottom:10px;">📜 Historial (ya liquidado, ${pedidosHistorial.length})</h4>
+                <div style="max-height:200px;overflow-y:auto;margin-bottom:20px;">
+                    <table style="width:100%;border-collapse:collapse;color:#888;">
+                        <thead>
+                            <tr style="border-bottom:2px solid #2a2a2a;text-align:left;">
+                                <th style="padding:8px;">#</th>
+                                <th style="padding:8px;">Descripción</th>
+                                <th style="padding:8px;">Pago</th>
+                                <th style="padding:8px;">Liquidado el</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${pedidosHistorial.map((p, i) => `
+                                <tr style="border-bottom:1px solid #2a2a2a;">
+                                    <td style="padding:8px;">${i + 1}</td>
+                                    <td style="padding:8px;">${p.descripcion}</td>
+                                    <td style="padding:8px;">$${p.pagoRepartidor}</td>
+                                    <td style="padding:8px;font-size:0.8rem;">${p.liquidacionFecha ? new Date(p.liquidacionFecha).toLocaleDateString() : 'N/A'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : ''}
+
             <!-- Botones de acción -->
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
                 <button onclick="compartirLiquidacionWhatsApp(${u.id})" style="flex:1;min-width:150px;padding:12px;background:#25D366;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">
@@ -469,7 +511,7 @@ function generarReporteTexto(usuarioId) {
     const u = usuariosCache.find(u => u.id === usuarioId);
     if (!u) return '';
     
-    const pedidosCompletados = pedidosCache.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'completado');
+    const pedidosCompletados = pedidosCache.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'completado' && !p.liquidado);
     const totalPedidos = pedidosCompletados.reduce((sum, p) => sum + (p.pagoRepartidor || 0), 0);
     const ajustes = u.ajustesLiquidacion || [];
     const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
@@ -553,27 +595,37 @@ async function pagarLiquidacion(id) {
     if (!f) { alert('Error de conexión'); return; }
     
     try {
+        const pedidos = await f.getPedidos();
+        const { pedidosActivos, totalGeneral } = calcularLiquidacion(id, pedidos, u.ajustesLiquidacion);
+
         const historial = await f.getHistorial();
         historial.push({
             usuarioId: id,
             usuarioNombre: u.nombre,
-            monto: u.liquidacionTotal || 0,
+            monto: totalGeneral,
             fecha: new Date().toISOString(),
-            detalle: 'Pago de liquidación - ' + (u.pedidosCompletados || 0) + ' pedidos'
+            detalle: 'Pago de liquidación - ' + pedidosActivos.length + ' pedidos'
         });
         await f.setHistorial(historial);
-        
+
+        // Marcar como liquidados los pedidos que se acaban de pagar
+        const fechaLiquidacion = new Date().toISOString();
+        for (const p of pedidosActivos) {
+            await f.setPedido(p.id, { ...p, liquidado: true, liquidacionFecha: fechaLiquidacion });
+        }
+
         await f.setUsuario(id, {
             ...u,
             liquidacionTotal: 0,
             pedidosCompletados: 0,
             ajustesLiquidacion: []
         });
-        
+
         const modal = document.querySelector('.modal-overlay');
         if (modal) modal.remove();
-        
+
         await cargarUsuarios();
+        await cargarPedidos();
         await cargarLiquidaciones();
         alert('✅ Liquidación pagada exitosamente');
     } catch (error) {
@@ -669,13 +721,58 @@ async function crearCliente() {
     const direccion = document.getElementById('clienteDireccion').value;
     const telefono = document.getElementById('clienteTelefono').value;
     const email = document.getElementById('clienteEmail').value;
+    const referencia = document.getElementById('clienteReferencia').value;
     if (!nombre || !direccion) { alert('Nombre y dirección son obligatorios'); return; }
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
     const id = await f.getNextId('clientes');
-    await f.setCliente(id, { nombre, direccion, telefono, email, activo: true });
+    await f.setCliente(id, { nombre, direccion, telefono, email, referencia, activo: true });
     hideForm('cliente');
-    ['clienteNombre','clienteDireccion','clienteTelefono','clienteEmail'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['clienteNombre','clienteDireccion','clienteTelefono','clienteEmail','clienteReferencia'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    await cargarClientes();
+}
+
+function editarCliente(id) {
+    const c = clientesCache.find(c => c.id === id);
+    if (!c) { alert('Cliente no encontrado'); return; }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;z-index:1000;padding:20px;';
+    modal.innerHTML = `
+        <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;max-width:480px;width:100%;padding:25px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a2a;padding-bottom:15px;margin-bottom:20px;">
+                <h2 style="color:#ff6b35;margin:0;">✏️ Editar Cliente</h2>
+                <button onclick="this.closest('.modal-overlay').remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">✕</button>
+            </div>
+            <input type="text" id="editClienteNombre" placeholder="Nombre del cliente" class="input-field" value="${c.nombre || ''}">
+            <input type="text" id="editClienteDireccion" placeholder="Dirección" class="input-field" value="${c.direccion || ''}">
+            <input type="text" id="editClienteTelefono" placeholder="Teléfono" class="input-field" value="${c.telefono || ''}">
+            <input type="email" id="editClienteEmail" placeholder="Email" class="input-field" value="${c.email || ''}">
+            <input type="text" id="editClienteReferencia" placeholder="Referencia / detalle (opcional)" class="input-field" value="${c.referencia || ''}">
+            <div class="form-actions">
+                <button type="button" onclick="guardarEdicionCliente(${id})" class="btn-primary">Guardar</button>
+                <button type="button" onclick="this.closest('.modal-overlay').remove()" class="btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function guardarEdicionCliente(id) {
+    const c = clientesCache.find(c => c.id === id);
+    if (!c) return;
+    const nombre = document.getElementById('editClienteNombre').value;
+    const direccion = document.getElementById('editClienteDireccion').value;
+    const telefono = document.getElementById('editClienteTelefono').value;
+    const email = document.getElementById('editClienteEmail').value;
+    const referencia = document.getElementById('editClienteReferencia').value;
+    if (!nombre || !direccion) { alert('Nombre y dirección son obligatorios'); return; }
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    await f.setCliente(id, { ...c, nombre, direccion, telefono, email, referencia });
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) modal.remove();
     await cargarClientes();
 }
 
@@ -837,20 +934,38 @@ async function cargarPanelUsuario(usuario) {
     
     const vehiculo = document.getElementById('vehiculoUsuario');
     if (vehiculo) vehiculo.textContent = getVehiculoIcon(usuario.vehiculo);
-    
-    const liquidacion = document.getElementById('liquidacionUsuario');
-    if (liquidacion) liquidacion.textContent = '$' + (usuario.liquidacionTotal || 0);
-    const ajustesUsuario = document.getElementById('ajustesUsuario');
-    if (ajustesUsuario) {
-        const ajustes = usuario.ajustesLiquidacion || [];
-        const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
-        ajustesUsuario.textContent = `${totalAjustes > 0 ? '+' : ''}$${totalAjustes}`;
-    }
-    
+
     actualizarEstado(usuario);
     await cargarPedidosUsuario(usuario.id);
+    actualizarLiquidacionUsuarioDOM(usuario);
     iniciarSeguimientoUbicacion();
     iniciarEscucha();
+    iniciarEscuchaUsuarioActual(usuario.id);
+}
+
+// Recalcula el total en base a pedidosCache (ya cargado por cargarPedidosUsuario)
+function actualizarLiquidacionUsuarioDOM(usuario) {
+    const { totalGeneral, totalAjustes } = calcularLiquidacion(usuario.id, pedidosCache, usuario.ajustesLiquidacion);
+    const liquidacion = document.getElementById('liquidacionUsuario');
+    if (liquidacion) liquidacion.textContent = '$' + totalGeneral;
+    const ajustesUsuario = document.getElementById('ajustesUsuario');
+    if (ajustesUsuario) ajustesUsuario.textContent = `${totalAjustes > 0 ? '+' : ''}$${totalAjustes}`;
+}
+
+// Escucha cambios propios en tiempo real (ej: liquidación pagada por el admin)
+function iniciarEscuchaUsuarioActual(id) {
+    const f = fb();
+    if (!f || !f.escucharUsuario) return;
+    f.escucharUsuario(id, function(usuarioActualizado) {
+        if (!usuarioActual || usuarioActual.id !== id) return;
+        usuarioActual = { ...usuarioActual, ...usuarioActualizado };
+        window.usuarioActual = usuarioActual;
+        guardarSesionUsuario(usuarioActual);
+        actualizarEstado(usuarioActual);
+        cargarPedidosUsuario(id)
+            .then(() => actualizarLiquidacionUsuarioDOM(usuarioActual))
+            .catch(console.error);
+    });
 }
 
 function getVehiculoIcon(v) {
@@ -1046,21 +1161,28 @@ function renderPedidosUsuario(pedidos, usuarioId) {
     }
     
     const hist = pedidos.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'completado');
+    const noLiquidados = hist.filter(p => !p.liquidado);
+    const liquidados = hist.filter(p => p.liquidado)
+        .sort((a, b) => new Date(b.liquidacionFecha || 0) - new Date(a.liquidacionFecha || 0));
     const el3 = document.getElementById('historialPedidos');
     if (el3) {
+        const renderHistRow = (p) => `
+            <div class="list-row">
+                <div class="list-row-main">
+                    <strong>📦 ${p.descripcion}</strong>
+                    <div>📍 ${p.origen} → ${p.destino}</div>
+                    <div>💰 Pago: $${p.pagoRepartidor}</div>
+                    <div>✅ ${p.fechaCompletado ? new Date(p.fechaCompletado).toLocaleString() : 'Sin fecha'}</div>
+                </div>
+            </div>
+        `;
         el3.innerHTML = `
             <div class="list-shell">
-                <div class="list-section-title">Historial</div>
-                ${hist.length === 0 ? '<p>No hay pedidos completados</p>' : hist.map(p => `
-                    <div class="list-row">
-                        <div class="list-row-main">
-                            <strong>📦 ${p.descripcion}</strong>
-                            <div>📍 ${p.origen} → ${p.destino}</div>
-                            <div>💰 Pago: $${p.pagoRepartidor}</div>
-                            <div>✅ ${p.fechaCompletado ? new Date(p.fechaCompletado).toLocaleString() : 'Sin fecha'}</div>
-                        </div>
-                    </div>
-                `).join('')}
+                <div class="list-section-title">No liquidado (activo)</div>
+                ${noLiquidados.length === 0 ? '<p>No hay pedidos pendientes de liquidar</p>' : noLiquidados.map(renderHistRow).join('')}
+                <div class="list-divider"></div>
+                <div class="list-section-title">Historial (ya liquidado)</div>
+                ${liquidados.length === 0 ? '<p>Todavía no hay liquidaciones pagadas</p>' : liquidados.map(renderHistRow).join('')}
             </div>
         `;
     }
@@ -1124,9 +1246,6 @@ async function completarPedidoUsuario(id) {
             });
             usuarioActual.liquidacionTotal = nuevoTotal;
             usuarioActual.pedidosCompletados = nuevosPedidos;
-            
-            const liquidacionEl = document.getElementById('liquidacionUsuario');
-            if (liquidacionEl) liquidacionEl.textContent = '$' + nuevoTotal;
             guardarSesionUsuario(usuarioActual);
         }
 
@@ -1135,6 +1254,7 @@ async function completarPedidoUsuario(id) {
         await f.setLiquidacionAdmin(liquidacionAdmin);
 
         await cargarPedidosUsuario(usuarioActual.id);
+        if (usuarioActual) actualizarLiquidacionUsuarioDOM(usuarioActual);
         alert('✅ Pedido completado exitosamente');
     } catch (error) {
         console.error('Error al completar pedido:', error);
@@ -1200,7 +1320,7 @@ function iniciarEscucha() {
             // ✅ ACTUALIZAR panel de usuario automáticamente
             if (usuarioActual) {
                 console.log('🔄 Actualizando panel de usuario automáticamente...');
-                cargarPedidosUsuario(usuarioActual.id);
+                cargarPedidosUsuario(usuarioActual.id).then(() => actualizarLiquidacionUsuarioDOM(usuarioActual));
             }
         }
     });
@@ -1236,7 +1356,9 @@ function iniciarPollingUsuario(usuarioId) {
     console.log('⏱️ Iniciando polling usuario cada', pollingIntervalMs, 'ms');
     userPollingId = setInterval(() => {
         if (usuarioActual && usuarioActual.id === usuarioId) {
-            cargarPedidosUsuario(usuarioId).catch(console.error);
+            cargarPedidosUsuario(usuarioId)
+                .then(() => actualizarLiquidacionUsuarioDOM(usuarioActual))
+                .catch(console.error);
         }
     }, pollingIntervalMs);
 }
@@ -1318,22 +1440,22 @@ async function cargarLiquidaciones() {
     const f = fb();
     if (!f) return;
     const usuarios = await f.getUsuarios();
+    const pedidos = await f.getPedidos();
     const container = document.getElementById('liquidacionesList');
     if (!container) return;
     container.innerHTML = `
         <div class="list-shell">
             <div class="list-section-title">Liquidaciones</div>
             ${usuarios.length === 0 ? '<p>No hay repartidores</p>' : usuarios.map(u => {
-                const ajustes = u.ajustesLiquidacion || [];
-                const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
+                const { pedidosActivos, ajustes, totalAjustes, totalGeneral } = calcularLiquidacion(u.id, pedidos, u.ajustesLiquidacion);
                 const ajustesLabel = ajustes.length > 0 ? `✏️ Ajustes: ${ajustes.length} · ${totalAjustes > 0 ? '+' : ''}$${totalAjustes}` : '✏️ Sin ajustes';
                 return `
                     <div class="list-row">
                         <div class="list-row-main">
                             <strong>${u.nombre}</strong>
                             <div>🚗 ${u.vehiculo}</div>
-                            <div>💰 $${u.liquidacionTotal || 0}</div>
-                            <div>📦 ${u.pedidosCompletados || 0}</div>
+                            <div>💰 $${totalGeneral}</div>
+                            <div>📦 ${pedidosActivos.length}</div>
                             <div>${ajustesLabel}</div>
                             <div class="badge ${u.activo ? 'badge-active' : 'badge-inactive'}">${u.activo ? '✅ Activo' : '❌ Inactivo'}</div>
                         </div>

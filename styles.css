@@ -152,6 +152,34 @@ body {
     color: #ff6b35;
 }
 
+/* ===== BRAND / LOGO ===== */
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.appLogo {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.brand h1 {
+    color: #ff6b35;
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.brand h2 {
+    color: #888;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
 /* ===== TABS ===== */
 .tabs {
     display: flex;

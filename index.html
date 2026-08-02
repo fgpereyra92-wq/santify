@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Entregas v3.0</title>
+    <title>Pedidos San</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -17,8 +17,13 @@
         <!-- ============================================ -->
         <div id="loginSection" class="section">
             <div class="login-box">
-                <h1>🚚 Gestor de Entregas</h1>
-                <h2>Panel de Administración</h2>
+                <div class="brand">
+                    <img class="appLogo" src="logo.png" alt="Pedidos San">
+                    <div>
+                        <h1>Pedidos San</h1>
+                        <h2>Panel de Administración</h2>
+                    </div>
+                </div>
                 <input type="password" id="adminPassword" placeholder="Clave de Administrador" class="input-field">
                 <button type="button" onclick="loginAdmin()" class="btn-primary">Ingresar</button>
                 <div id="loginError" class="error-message"></div>
@@ -37,8 +42,13 @@
         <!-- ============================================ -->
         <div id="loginUsuarioSection" class="section" style="display:none;">
             <div class="login-box">
-                <h1>🚚 Gestor de Entregas</h1>
-                <h2>Panel de Repartidor</h2>
+                <div class="brand">
+                    <img class="appLogo" src="logo.png" alt="Pedidos San">
+                    <div>
+                        <h1>Pedidos San</h1>
+                        <h2>Panel de Repartidor</h2>
+                    </div>
+                </div>
                 <input type="text" id="userLogin" placeholder="Usuario" class="input-field">
                 <input type="password" id="userPass" placeholder="Contraseña" class="input-field">
                 <button type="button" onclick="loginUsuario()" class="btn-primary">Ingresar</button>
@@ -58,7 +68,10 @@
         <!-- ============================================ -->
         <div id="adminPanel" class="section" style="display:none;">
             <div class="admin-header">
-                <h1>👨‍💼 Panel de Administración</h1>
+                <div class="brand">
+                    <img class="appLogo" src="logo.png" alt="Pedidos San">
+                    <h1>Pedidos San — Panel de Administración</h1>
+                </div>
                 <button type="button" onclick="logout()" class="btn-danger">Cerrar Sesión</button>
             </div>
 
@@ -174,7 +187,10 @@
         <!-- ============================================ -->
         <div id="usuarioPanel" class="section" style="display:none;">
             <div class="admin-header">
-                <h1 id="bienvenidaUsuario">👋 Hola, Repartidor</h1>
+                <div class="brand">
+                    <img class="appLogo" src="logo.png" alt="Pedidos San">
+                    <h1 id="bienvenidaUsuario">👋 Hola, Repartidor</h1>
+                </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <button type="button" onclick="activarSonidoManual()" class="btn-warning" id="btnActivarSonido">
                         🔊 Activar Sonido

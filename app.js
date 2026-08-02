@@ -245,6 +245,9 @@ function renderUsuarios(usuarios) {
                 const calificacion = u.calificacion ? `${'★'.repeat(u.calificacion)} (${u.calificacion}/5)` : 'Sin calificación';
                 const ubicacion = u.ubicacion ? `${u.ubicacion.lat.toFixed(4)}, ${u.ubicacion.lng.toFixed(4)}` : 'Sin GPS';
                 const gpsStatus = u.gpsActiva ? '🛰️ GPS activo' : '⚠️ GPS inactivo';
+                const ajustes = u.ajustesLiquidacion || [];
+                const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
+                const ajustesLabel = ajustes.length > 0 ? `✏️ Ajustes: ${ajustes.length} · ${totalAjustes > 0 ? '+' : ''}$${totalAjustes}` : '✏️ Sin ajustes';
                 return `
                     <div class="list-row">
                         <div class="list-row-main" style="display:flex;align-items:center;">
@@ -254,6 +257,7 @@ function renderUsuarios(usuarios) {
                                 <div>👤 @${u.username}</div>
                                 <div>🚗 ${u.vehiculo}</div>
                                 <div>💰 $${u.liquidacionTotal || 0} · 📦 ${u.pedidosCompletados || 0}</div>
+                                <div>${ajustesLabel}</div>
                                 <div>⭐ ${calificacion}</div>
                                 <div>📍 ${ubicacion}</div>
                                 <div>${gpsStatus}</div>
@@ -808,8 +812,18 @@ async function ajustarLiquidacion(id) {
     });
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
-    await f.setUsuario(id, { ...u, ajustesLiquidacion: ajustes, liquidacionTotal: (u.liquidacionTotal || 0) + monto });
+    const nuevoLiquidacionTotal = (u.liquidacionTotal || 0) + monto;
+    await f.setUsuario(id, { ...u, ajustesLiquidacion: ajustes, liquidacionTotal: nuevoLiquidacionTotal });
+    u.ajustesLiquidacion = ajustes;
+    u.liquidacionTotal = nuevoLiquidacionTotal;
     await cargarUsuarios();
+    await cargarLiquidaciones();
+    if (usuarioActual && usuarioActual.id === id) {
+        usuarioActual.ajustesLiquidacion = ajustes;
+        usuarioActual.liquidacionTotal = nuevoLiquidacionTotal;
+        window.usuarioActual = usuarioActual;
+        await cargarPanelUsuario(usuarioActual);
+    }
     alert('✅ Ajuste aplicado correctamente');
 }
 
@@ -826,6 +840,12 @@ async function cargarPanelUsuario(usuario) {
     
     const liquidacion = document.getElementById('liquidacionUsuario');
     if (liquidacion) liquidacion.textContent = '$' + (usuario.liquidacionTotal || 0);
+    const ajustesUsuario = document.getElementById('ajustesUsuario');
+    if (ajustesUsuario) {
+        const ajustes = usuario.ajustesLiquidacion || [];
+        const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
+        ajustesUsuario.textContent = `${totalAjustes > 0 ? '+' : ''}$${totalAjustes}`;
+    }
     
     actualizarEstado(usuario);
     await cargarPedidosUsuario(usuario.id);
@@ -1303,21 +1323,27 @@ async function cargarLiquidaciones() {
     container.innerHTML = `
         <div class="list-shell">
             <div class="list-section-title">Liquidaciones</div>
-            ${usuarios.length === 0 ? '<p>No hay repartidores</p>' : usuarios.map(u => `
-                <div class="list-row">
-                    <div class="list-row-main">
-                        <strong>${u.nombre}</strong>
-                        <div>🚗 ${u.vehiculo}</div>
-                        <div>💰 $${u.liquidacionTotal || 0}</div>
-                        <div>📦 ${u.pedidosCompletados || 0}</div>
-                        <div class="badge ${u.activo ? 'badge-active' : 'badge-inactive'}">${u.activo ? '✅ Activo' : '❌ Inactivo'}</div>
+            ${usuarios.length === 0 ? '<p>No hay repartidores</p>' : usuarios.map(u => {
+                const ajustes = u.ajustesLiquidacion || [];
+                const totalAjustes = ajustes.reduce((sum, a) => sum + (a.monto || 0), 0);
+                const ajustesLabel = ajustes.length > 0 ? `✏️ Ajustes: ${ajustes.length} · ${totalAjustes > 0 ? '+' : ''}$${totalAjustes}` : '✏️ Sin ajustes';
+                return `
+                    <div class="list-row">
+                        <div class="list-row-main">
+                            <strong>${u.nombre}</strong>
+                            <div>🚗 ${u.vehiculo}</div>
+                            <div>💰 $${u.liquidacionTotal || 0}</div>
+                            <div>📦 ${u.pedidosCompletados || 0}</div>
+                            <div>${ajustesLabel}</div>
+                            <div class="badge ${u.activo ? 'badge-active' : 'badge-inactive'}">${u.activo ? '✅ Activo' : '❌ Inactivo'}</div>
+                        </div>
+                        <div class="list-row-actions">
+                            <button onclick="verLiquidacionDetalle(${u.id})" class="btn-primary">💰 Ver Detalle</button>
+                            <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
+                        </div>
                     </div>
-                    <div class="list-row-actions">
-                        <button onclick="verLiquidacionDetalle(${u.id})" class="btn-primary">💰 Ver Detalle</button>
-                        <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
-                    </div>
-                </div>
-            `).join('')}
+                `;
+            }).join('')}
         </div>
     `;
 }

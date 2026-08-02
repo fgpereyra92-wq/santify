@@ -15,6 +15,9 @@ const firebaseConfig = {
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
+const storage = firebase.storage();
+
+window.firebaseStorage = storage;
 
 // Mantener conexión activa
 database.goOnline();

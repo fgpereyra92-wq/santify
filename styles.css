@@ -118,6 +118,20 @@ body {
     background: #5a6268;
 }
 
+.btn-warning {
+    padding: 8px 16px;
+    background: #ffc107;
+    color: #111;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+}
+
 .error-message {
     color: #dc3545;
     margin-top: 10px;
@@ -173,19 +187,65 @@ body {
     display: block;
 }
 
-/* ===== CARDS ===== */
+/* ===== LISTADOS ===== */
 .card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
     margin-top: 20px;
+}
+
+.list-shell {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.list-section-title {
+    color: #ff6b35;
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.list-divider {
+    border-top: 1px solid #2a2a2a;
+    margin: 12px 0;
+}
+
+.list-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #232323;
+}
+
+.list-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.list-row-main {
+    flex: 1;
+}
+
+.list-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
 }
 
 .card {
     background: #1a1a1a;
     border: 1px solid #2a2a2a;
     border-radius: 8px;
-    padding: 20px;
+    padding: 16px;
     transition: all 0.3s;
 }
 
@@ -203,6 +263,32 @@ body {
 .card p {
     margin: 5px 0;
     color: #b0b0b0;
+}
+
+.avatar-preview {
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+    color: #888;
+}
+
+.avatar-preview img {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid #ff6b35;
+}
+
+.user-avatar {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid #ff6b35;
+    margin-right: 10px;
 }
 
 /* ===== BADGES ===== */
@@ -297,6 +383,27 @@ body {
 }
 
 /* ===== STATUS BAR ===== */
+.stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: #1a1a1a;
+    padding: 16px;
+    border-radius: 8px;
+    margin: 20px 0;
+    border: 1px solid #2a2a2a;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #232323;
+    border: 1px solid #2f2f2f;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+
 .status-bar {
     display: flex;
     flex-wrap: wrap;
@@ -317,6 +424,51 @@ body {
 .status-item label {
     font-weight: bold;
     color: #888;
+}
+
+/* ===== TABLA GPS ===== */
+.gps-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.gps-table th,
+.gps-table td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid #2a2a2a;
+    color: #e0e0e0;
+}
+
+.gps-table th {
+    background: #232323;
+    color: #ff6b35;
+    font-size: 0.9rem;
+}
+
+.gps-table tr:last-child td {
+    border-bottom: none;
+}
+
+.gps-map-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 12px;
+}
+
+.gps-map-frame {
+    width: 100%;
+    height: 280px;
+    border: 0;
+    border-radius: 8px;
+    background: #111;
 }
 
 /* ===== MODAL ===== */

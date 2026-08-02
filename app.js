@@ -10,6 +10,8 @@ let clientesCache = [];
 let historialLiquidaciones = [];
 let liquidacionAdmin = { total: 0, historial: [] };
 let ultimoPedidoPendiente = null;
+let geolocationWatchId = null;
+let geolocationActive = false;
 
 // ============================================================
 // ===== HELPER PARA FIREBASE =====
@@ -90,6 +92,7 @@ function loginAdmin() {
 function logout() {
     if (!confirm('¿Cerrar sesión?')) return;
     limpiarSesion();
+    detenerSeguimientoUbicacion();
     const f = fb();
     if (f) f.dejarDeEscuchar();
     const loginSection = document.getElementById('loginSection');
@@ -142,6 +145,7 @@ function logoutUsuario() {
     usuarioActual = null;
     window.usuarioActual = null;
     limpiarSesion();
+    detenerSeguimientoUbicacion();
     const f = fb();
     if (f) f.dejarDeEscuchar();
     
@@ -222,83 +226,117 @@ function renderUsuarios(usuarios) {
     const container = document.getElementById('listaUsuarios');
     if (!container) return;
     if (!usuarios || usuarios.length === 0) {
-        container.innerHTML = '<p>No hay usuarios</p>';
+        container.innerHTML = '<div class="list-shell"><p>No hay usuarios</p></div>';
         return;
     }
-    container.innerHTML = usuarios.map(u => `
-        <div class="card">
-            <h4>${u.nombre}</h4>
-            <p>👤 @${u.username}</p>
-            <p>🚗 ${u.vehiculo}</p>
-            <p>💰 $${u.liquidacionTotal || 0}</p>
-            <p>📦 ${u.pedidosCompletados || 0}</p>
-            <span class="badge ${u.activo && u.disponible ? 'badge-active' : 'badge-inactive'}">
-                ${u.activo ? (u.disponible ? '🟢 Disponible' : '⏸️ No disponible') : '❌ Inactivo'}
-            </span>
-            <div class="card-actions">
-                <button onclick="toggleUsuarioActivo(${u.id})" class="${u.activo ? 'btn-danger' : 'btn-success'}">
-                    ${u.activo ? 'Desactivar' : 'Activar'}
-                </button>
-                <button onclick="toggleDisponibilidadAdmin(${u.id})" class="${u.disponible ? 'btn-secondary' : 'btn-success'}" ${!u.activo ? 'disabled' : ''}>
-                    ${u.disponible ? '⏸️ Pausar' : '▶️ Activar'}
-                </button>
-                <button onclick="verLiquidacionDetalle(${u.id})" class="btn-primary">💰 Liquidación</button>
-                <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
-                <button onclick="eliminarUsuario(${u.id})" class="btn-danger">Eliminar</button>
-            </div>
+    container.innerHTML = `
+        <div class="list-shell">
+            <div class="list-section-title">Repartidores</div>
+            ${usuarios.map(u => {
+                const estado = u.activo ? (u.disponible ? '🟢 Disponible' : '⏸️ No disponible') : '❌ Inactivo';
+                const calificacion = u.calificacion ? `${'★'.repeat(u.calificacion)} (${u.calificacion}/5)` : 'Sin calificación';
+                const ubicacion = u.ubicacion ? `${u.ubicacion.lat.toFixed(4)}, ${u.ubicacion.lng.toFixed(4)}` : 'Sin GPS';
+                const gpsStatus = u.gpsActiva ? '🛰️ GPS activo' : '⚠️ GPS inactivo';
+                return `
+                    <div class="list-row">
+                        <div class="list-row-main" style="display:flex;align-items:center;">
+                            <span style="font-size:1.4rem;margin-right:10px;">👤</span>
+                            <div>
+                                <strong>${u.nombre}</strong>
+                                <div>👤 @${u.username}</div>
+                                <div>🚗 ${u.vehiculo}</div>
+                                <div>💰 $${u.liquidacionTotal || 0} · 📦 ${u.pedidosCompletados || 0}</div>
+                                <div>⭐ ${calificacion}</div>
+                                <div>📍 ${ubicacion}</div>
+                                <div>${gpsStatus}</div>
+                                <div class="badge ${u.activo && u.disponible ? 'badge-active' : 'badge-inactive'}">${estado}</div>
+                            </div>
+                        </div>
+                        <div class="list-row-actions">
+                            <button onclick="toggleUsuarioActivo(${u.id})" class="${u.activo ? 'btn-danger' : 'btn-success'}">${u.activo ? 'Desactivar' : 'Activar'}</button>
+                            <button onclick="toggleDisponibilidadAdmin(${u.id})" class="${u.disponible ? 'btn-secondary' : 'btn-success'}" ${!u.activo ? 'disabled' : ''}>${u.disponible ? '⏸️ Pausar' : '▶️ Activar'}</button>
+                            <button onclick="calificarUsuario(${u.id})" class="btn-secondary">⭐ Calificar</button>
+                            <button onclick="verLiquidacionDetalle(${u.id})" class="btn-primary">💰 Liquidación</button>
+                            <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
+                            <button onclick="eliminarUsuario(${u.id})" class="btn-danger">Eliminar</button>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
         </div>
-    `).join('');
+    `;
 }
 
 function renderClientes(clientes) {
     const container = document.getElementById('listaClientes');
     if (!container) return;
     if (!clientes || clientes.length === 0) {
-        container.innerHTML = '<p>No hay clientes</p>';
+        container.innerHTML = '<div class="list-shell"><p>No hay clientes</p></div>';
         return;
     }
-    container.innerHTML = clientes.map(c => `
-        <div class="card">
-            <h4>${c.nombre}</h4>
-            <p>📍 ${c.direccion || 'Sin dirección'}</p>
-            <p>📞 ${c.telefono || 'Sin teléfono'}</p>
-            <span class="badge ${c.activo ? 'badge-active' : 'badge-inactive'}">
-                ${c.activo ? '✅ Activo' : '❌ Inactivo'}
-            </span>
-            <div class="card-actions">
-                <button onclick="toggleClienteActivo(${c.id})" class="${c.activo ? 'btn-danger' : 'btn-success'}">
-                    ${c.activo ? 'Desactivar' : 'Activar'}
-                </button>
-                <button onclick="eliminarCliente(${c.id})" class="btn-danger">Eliminar</button>
-            </div>
+    container.innerHTML = `
+        <div class="list-shell">
+            <div class="list-section-title">Clientes</div>
+            ${clientes.map(c => `
+                <div class="list-row">
+                    <div class="list-row-main">
+                        <strong>${c.nombre}</strong>
+                        <div>📍 ${c.direccion || 'Sin dirección'}</div>
+                        <div>📞 ${c.telefono || 'Sin teléfono'}</div>
+                        <div class="badge ${c.activo ? 'badge-active' : 'badge-inactive'}">${c.activo ? '✅ Activo' : '❌ Inactivo'}</div>
+                    </div>
+                    <div class="list-row-actions">
+                        <button onclick="toggleClienteActivo(${c.id})" class="${c.activo ? 'btn-danger' : 'btn-success'}">${c.activo ? 'Desactivar' : 'Activar'}</button>
+                        <button onclick="eliminarCliente(${c.id})" class="btn-danger">Eliminar</button>
+                    </div>
+                </div>
+            `).join('')}
         </div>
-    `).join('');
+    `;
 }
 
 function renderPedidosAdmin(pedidos) {
     const container = document.getElementById('listaPedidos');
     if (!container) return;
     if (!pedidos || pedidos.length === 0) {
-        container.innerHTML = '<p>No hay pedidos</p>';
+        container.innerHTML = '<div class="list-shell"><p>No hay pedidos</p></div>';
         return;
     }
-    container.innerHTML = pedidos.map(p => {
+
+    const vigentes = pedidos.filter(p => p.estado === 'pendiente' || p.estado === 'asignado');
+    const registros = pedidos.filter(p => p.estado === 'completado' || p.estado === 'cancelado');
+
+    const renderPedidoRow = (p) => {
         const u = usuariosCache.find(u => u.id === p.usuarioAsignado);
+        const estado = (p.estado || 'pendiente').toUpperCase();
         return `
-        <div class="card">
-            <h4>📦 ${p.descripcion}</h4>
-            <p>📍 ${p.origen || 'Sin origen'} → ${p.destino || 'Sin destino'}</p>
-            <p>💰 Servicio: $${p.costoServicio || 0} | Repartidor: $${p.pagoRepartidor || 0}</p>
-            <p>👤 ${u ? u.nombre : 'Sin asignar'}</p>
-            <p>🕐 ${p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleString() : 'Sin fecha'}</p>
-            <span class="badge badge-${p.estado || 'pendiente'}">${(p.estado || 'pendiente').toUpperCase()}</span>
-            <div class="card-actions">
-                ${p.estado === 'pendiente' ? `<button onclick="asignarPedido(${p.id})" class="btn-primary">Asignar</button>` : ''}
-                ${p.estado === 'asignado' ? `<button onclick="completarPedido(${p.id})" class="btn-success">Completar</button>` : ''}
-                <button onclick="eliminarPedido(${p.id})" class="btn-danger">Eliminar</button>
+            <div class="list-row">
+                <div class="list-row-main">
+                    <strong>📦 ${p.descripcion}</strong>
+                    <div>📍 ${p.origen || 'Sin origen'} → ${p.destino || 'Sin destino'}</div>
+                    <div>💰 Servicio: $${p.costoServicio || 0} · Repartidor: $${p.pagoRepartidor || 0}</div>
+                    <div>👤 ${u ? u.nombre : 'Sin asignar'}</div>
+                    <div>🕐 ${p.fechaCreacion ? new Date(p.fechaCreacion).toLocaleString() : 'Sin fecha'}</div>
+                    <div class="badge badge-${p.estado || 'pendiente'}">${estado}</div>
+                </div>
+                <div class="list-row-actions">
+                    ${p.estado === 'pendiente' ? `<button onclick="asignarPedido(${p.id})" class="btn-primary">Asignar</button>` : ''}
+                    ${p.estado === 'asignado' ? `<button onclick="completarPedido(${p.id})" class="btn-success">Completar</button>` : ''}
+                    <button onclick="eliminarPedido(${p.id})" class="btn-danger">Eliminar</button>
+                </div>
             </div>
+        `;
+    };
+
+    container.innerHTML = `
+        <div class="list-shell">
+            <div class="list-section-title">Solicitudes vigentes</div>
+            ${vigentes.length === 0 ? '<p>No hay solicitudes vigentes</p>' : vigentes.map(renderPedidoRow).join('')}
+            <div class="list-divider"></div>
+            <div class="list-section-title">Registros</div>
+            ${registros.length === 0 ? '<p>No hay registros</p>' : registros.map(renderPedidoRow).join('')}
         </div>
-    `}).join('');
+    `;
 }
 
 // ============================================================
@@ -545,12 +583,26 @@ async function crearUsuario() {
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
     const id = await f.getNextId('usuarios');
-    await f.setUsuario(id, { nombre, username, password, vehiculo, activo: true, disponible: true, liquidacionTotal: 0, pedidosCompletados: 0, ajustesLiquidacion: [] });
+    await f.setUsuario(id, {
+        nombre,
+        username,
+        password,
+        vehiculo,
+        activo: true,
+        disponible: true,
+        liquidacionTotal: 0,
+        pedidosCompletados: 0,
+        ajustesLiquidacion: [],
+        calificacion: 0,
+        ubicacion: null,
+        gpsActiva: false
+    });
     hideForm('usuario');
     ['nombre','username','password'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const vehEl = document.getElementById('vehiculo');
     if (vehEl) vehEl.value = 'bici';
     await cargarUsuarios();
+    alert('✅ Usuario creado correctamente');
 }
 
 async function toggleUsuarioActivo(id) {
@@ -578,6 +630,21 @@ async function eliminarUsuario(id) {
     const f = fb();
     if (!f) return;
     await f.deleteUsuario(id);
+    await cargarUsuarios();
+}
+
+async function calificarUsuario(id) {
+    const u = usuariosCache.find(u => u.id === id);
+    if (!u) return;
+    const valor = prompt(`Calificación para ${u.nombre} (1 a 5):`, u.calificacion || '0');
+    const calificacion = parseInt(valor, 10);
+    if (isNaN(calificacion) || calificacion < 1 || calificacion > 5) {
+        alert('La calificación debe ser un número entre 1 y 5');
+        return;
+    }
+    const f = fb();
+    if (!f) return;
+    await f.setUsuario(id, { ...u, calificacion });
     await cargarUsuarios();
 }
 
@@ -754,6 +821,7 @@ async function cargarPanelUsuario(usuario) {
     
     actualizarEstado(usuario);
     await cargarPedidosUsuario(usuario.id);
+    iniciarSeguimientoUbicacion();
     iniciarEscucha();
 }
 
@@ -765,6 +833,8 @@ function getVehiculoIcon(v) {
 function actualizarEstado(usuario) {
     const es = document.getElementById('estadoUsuario');
     const btn = document.getElementById('btnDisponibilidad');
+    const gpsEl = document.getElementById('gpsUsuario');
+    const ubicacionEl = document.getElementById('ubicacionUsuario');
     if (!es || !btn) return;
     if (usuario.activo && usuario.disponible) {
         es.textContent = '✅ Activo';
@@ -785,6 +855,16 @@ function actualizarEstado(usuario) {
         btn.className = 'btn-danger';
         btn.disabled = true;
     }
+    if (gpsEl) {
+        gpsEl.textContent = usuario.gpsActiva ? '📍 GPS activo' : '⚠️ GPS desactivado';
+    }
+    if (ubicacionEl) {
+        if (usuario.ubicacion) {
+            ubicacionEl.textContent = `${usuario.ubicacion.lat.toFixed(4)}, ${usuario.ubicacion.lng.toFixed(4)}`;
+        } else {
+            ubicacionEl.textContent = 'Sin datos';
+        }
+    }
 }
 
 async function toggleDisponibilidad() {
@@ -792,12 +872,95 @@ async function toggleDisponibilidad() {
     const nuevo = !usuarioActual.disponible;
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
+
+    if (nuevo) {
+        const gpsOk = await requerirGpsParaDisponibilidad();
+        if (!gpsOk) {
+            return;
+        }
+    }
+
+    if (!nuevo) {
+        detenerSeguimientoUbicacion();
+        usuarioActual.gpsActiva = false;
+    }
+
     await f.setUsuario(usuarioActual.id, { ...usuarioActual, disponible: nuevo });
     usuarioActual.disponible = nuevo;
     window.usuarioActual = usuarioActual;
     guardarSesionUsuario(usuarioActual);
     actualizarEstado(usuarioActual);
     await cargarPedidosUsuario(usuarioActual.id);
+}
+
+function detenerSeguimientoUbicacion() {
+    if (geolocationWatchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(geolocationWatchId);
+    }
+    geolocationWatchId = null;
+    geolocationActive = false;
+}
+
+function iniciarSeguimientoUbicacion() {
+    if (!navigator.geolocation || !usuarioActual) return;
+    if (geolocationActive) return;
+
+    const f = fb();
+    if (!f) return;
+
+    const actualizarUbicacion = (position) => {
+        const nuevaUbicacion = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString()
+        };
+        const siguiente = { ...usuarioActual, ubicacion: nuevaUbicacion, gpsActiva: true };
+        usuarioActual = siguiente;
+        window.usuarioActual = siguiente;
+        guardarSesionUsuario(siguiente);
+        f.setUsuario(siguiente.id, siguiente).catch(console.error);
+        actualizarEstado(siguiente);
+    };
+
+    const errorHandler = (error) => {
+        const siguiente = { ...usuarioActual, gpsActiva: false, ubicacion: null };
+        usuarioActual = siguiente;
+        window.usuarioActual = siguiente;
+        guardarSesionUsuario(siguiente);
+        f.setUsuario(siguiente.id, siguiente).catch(console.error);
+        actualizarEstado(siguiente);
+        console.warn('GPS no disponible:', error.message);
+    };
+
+    geolocationActive = true;
+    geolocationWatchId = navigator.geolocation.watchPosition(actualizarUbicacion, errorHandler, {
+        enableHighAccuracy: true,
+        maximumAge: 10000,
+        timeout: 20000
+    });
+}
+
+function requerirGpsParaDisponibilidad() {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            alert('Tu navegador no soporta GPS');
+            resolve(false);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            () => {
+                iniciarSeguimientoUbicacion();
+                resolve(true);
+            },
+            (error) => {
+                console.warn('GPS denegado:', error.message);
+                alert('Debes activar el GPS para pasar a disponible');
+                resolve(false);
+            },
+            { enableHighAccuracy: true, timeout: 15000 }
+        );
+    });
 }
 
 async function cargarPedidosUsuario(usuarioId) {
@@ -812,48 +975,66 @@ function renderPedidosUsuario(pedidos, usuarioId) {
     const pendientes = pedidos.filter(p => p.estado === 'pendiente');
     const el = document.getElementById('pedidosPendientes');
     if (el) {
-        el.innerHTML = pendientes.length === 0 ? '<p>No hay pedidos disponibles</p>' :
-            pendientes.map(p => `
-                <div class="card">
-                    <h4>📦 ${p.descripcion}</h4>
-                    <p>📍 ${p.origen || 'Sin origen'} → ${p.destino || 'Sin destino'}</p>
-                    <p>💰 Pago: $${p.pagoRepartidor || 0}</p>
-                    <div class="card-actions">
-                        <button onclick="tomarPedido(${p.id})" class="btn-success">✅ Tomar Pedido</button>
+        el.innerHTML = `
+            <div class="list-shell">
+                <div class="list-section-title">Solicitudes vigentes</div>
+                ${pendientes.length === 0 ? '<p>No hay pedidos disponibles</p>' : pendientes.map(p => `
+                    <div class="list-row">
+                        <div class="list-row-main">
+                            <strong>📦 ${p.descripcion}</strong>
+                            <div>📍 ${p.origen || 'Sin origen'} → ${p.destino || 'Sin destino'}</div>
+                            <div>💰 Pago: $${p.pagoRepartidor || 0}</div>
+                        </div>
+                        <div class="list-row-actions">
+                            <button onclick="tomarPedido(${p.id})" class="btn-success">✅ Tomar Pedido</button>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `).join('')}
+            </div>
+        `;
     }
     
     const mis = pedidos.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'asignado');
     const el2 = document.getElementById('misPedidos');
     if (el2) {
-        el2.innerHTML = mis.length === 0 ? '<p>No tienes pedidos asignados</p>' :
-            mis.map(p => `
-                <div class="card">
-                    <h4>📦 ${p.descripcion}</h4>
-                    <p>📍 ${p.origen} → ${p.destino}</p>
-                    <p>💰 Pago: $${p.pagoRepartidor}</p>
-                    <span class="badge badge-asignado">ASIGNADO</span>
-                    <div class="card-actions">
-                        <button onclick="completarPedidoUsuario(${p.id})" class="btn-success">✅ Completar</button>
+        el2.innerHTML = `
+            <div class="list-shell">
+                <div class="list-section-title">Mis pedidos</div>
+                ${mis.length === 0 ? '<p>No tienes pedidos asignados</p>' : mis.map(p => `
+                    <div class="list-row">
+                        <div class="list-row-main">
+                            <strong>📦 ${p.descripcion}</strong>
+                            <div>📍 ${p.origen} → ${p.destino}</div>
+                            <div>💰 Pago: $${p.pagoRepartidor}</div>
+                            <div class="badge badge-asignado">ASIGNADO</div>
+                        </div>
+                        <div class="list-row-actions">
+                            <button onclick="completarPedidoUsuario(${p.id})" class="btn-success">✅ Completar</button>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `).join('')}
+            </div>
+        `;
     }
     
     const hist = pedidos.filter(p => p.usuarioAsignado === usuarioId && p.estado === 'completado');
     const el3 = document.getElementById('historialPedidos');
     if (el3) {
-        el3.innerHTML = hist.length === 0 ? '<p>No hay pedidos completados</p>' :
-            hist.map(p => `
-                <div class="card">
-                    <h4>📦 ${p.descripcion}</h4>
-                    <p>📍 ${p.origen} → ${p.destino}</p>
-                    <p>💰 Pago: $${p.pagoRepartidor}</p>
-                    <p>✅ ${p.fechaCompletado ? new Date(p.fechaCompletado).toLocaleString() : 'Sin fecha'}</p>
-                </div>
-            `).join('');
+        el3.innerHTML = `
+            <div class="list-shell">
+                <div class="list-section-title">Historial</div>
+                ${hist.length === 0 ? '<p>No hay pedidos completados</p>' : hist.map(p => `
+                    <div class="list-row">
+                        <div class="list-row-main">
+                            <strong>📦 ${p.descripcion}</strong>
+                            <div>📍 ${p.origen} → ${p.destino}</div>
+                            <div>💰 Pago: $${p.pagoRepartidor}</div>
+                            <div>✅ ${p.fechaCompletado ? new Date(p.fechaCompletado).toLocaleString() : 'Sin fecha'}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
 }
 
@@ -1017,7 +1198,7 @@ function activarSonidoManual() {
 function showTab(tab) {
     document.querySelectorAll('.tab-content').forEach(el => { if (el) el.style.display = 'none'; });
     document.querySelectorAll('.tab-btn').forEach(el => { if (el) el.classList.remove('active'); });
-    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'admin'];
+    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'gps', 'admin'];
     const idx = tabs.indexOf(tab);
     if (idx >= 0) {
         const el = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
@@ -1028,6 +1209,7 @@ function showTab(tab) {
         else if (tab === 'clientes') cargarClientes();
         else if (tab === 'pedidos') cargarPedidos();
         else if (tab === 'liquidaciones') cargarLiquidaciones();
+        else if (tab === 'gps') cargarVistaGps();
         else if (tab === 'admin') cargarLiquidacionAdmin();
     }
 }
@@ -1062,19 +1244,78 @@ async function cargarLiquidaciones() {
     const usuarios = await f.getUsuarios();
     const container = document.getElementById('liquidacionesList');
     if (!container) return;
-    container.innerHTML = usuarios.map(u => `
-        <div class="card">
-            <h4>${u.nombre}</h4>
-            <p>🚗 ${u.vehiculo}</p>
-            <p>💰 $${u.liquidacionTotal || 0}</p>
-            <p>📦 ${u.pedidosCompletados || 0}</p>
-            <span class="badge ${u.activo ? 'badge-active' : 'badge-inactive'}">${u.activo ? '✅ Activo' : '❌ Inactivo'}</span>
-            <div class="card-actions">
-                <button onclick="verLiquidacionDetalle(${u.id})" class="btn-primary">💰 Ver Detalle</button>
-                <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
-            </div>
+    container.innerHTML = `
+        <div class="list-shell">
+            <div class="list-section-title">Liquidaciones</div>
+            ${usuarios.length === 0 ? '<p>No hay repartidores</p>' : usuarios.map(u => `
+                <div class="list-row">
+                    <div class="list-row-main">
+                        <strong>${u.nombre}</strong>
+                        <div>🚗 ${u.vehiculo}</div>
+                        <div>💰 $${u.liquidacionTotal || 0}</div>
+                        <div>📦 ${u.pedidosCompletados || 0}</div>
+                        <div class="badge ${u.activo ? 'badge-active' : 'badge-inactive'}">${u.activo ? '✅ Activo' : '❌ Inactivo'}</div>
+                    </div>
+                    <div class="list-row-actions">
+                        <button onclick="verLiquidacionDetalle(${u.id})" class="btn-primary">💰 Ver Detalle</button>
+                        <button onclick="ajustarLiquidacion(${u.id})" class="btn-secondary">✏️ Ajustar</button>
+                    </div>
+                </div>
+            `).join('')}
         </div>
-    `).join('');
+    `;
+}
+
+async function cargarVistaGps() {
+    const f = fb();
+    if (!f) return;
+    const usuarios = await f.getUsuarios();
+    const container = document.getElementById('vistaGps');
+    if (!container) return;
+
+    const activos = usuarios.filter(u => u.activo && u.disponible && u.gpsActiva && u.ubicacion);
+
+    if (activos.length === 0) {
+        container.innerHTML = '<div class="list-shell"><p>No hay repartidores activos con GPS en este momento.</p></div>';
+        return;
+    }
+
+    const tabla = `
+        <div class="list-shell">
+            <div class="list-section-title">Tabla operativa</div>
+            <table class="gps-table">
+                <thead>
+                    <tr>
+                        <th>Repartidor</th>
+                        <th>Vehículo</th>
+                        <th>Ubicación</th>
+                        <th>Última actualización</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${activos.map(u => `
+                        <tr>
+                            <td>${u.nombre}</td>
+                            <td>${u.vehiculo}</td>
+                            <td>${u.ubicacion.lat.toFixed(4)}, ${u.ubicacion.lng.toFixed(4)}</td>
+                            <td>${u.ubicacion.timestamp ? new Date(u.ubicacion.timestamp).toLocaleTimeString() : 'Sin hora'}</td>
+                            <td><span class="badge badge-active">🟢 En línea</span></td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    const mapa = `
+        <div class="gps-map-card">
+            <div class="list-section-title">Vista mapa simple</div>
+            <iframe class="gps-map-frame" src="https://www.openstreetmap.org/export/embed.html?bbox=${(u => u ? u.ubicacion.lng - 0.02 : 0).toString()}%2C${(u => u ? u.ubicacion.lat - 0.02 : 0).toString()}%2C${(u => u ? u.ubicacion.lng + 0.02 : 0).toString()}%2C${(u => u ? u.ubicacion.lat + 0.02 : 0).toString()}&layer=mapnik"></iframe>
+        </div>
+    `;
+
+    container.innerHTML = `${tabla}${mapa}`;
 }
 
 function showForm(tipo) {

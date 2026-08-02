@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 </head>
 <body>
     <div class="container">
@@ -66,6 +67,7 @@
                 <button type="button" class="tab-btn" onclick="showTab('clientes')">🏢 Clientes</button>
                 <button type="button" class="tab-btn" onclick="showTab('pedidos')">📦 Pedidos</button>
                 <button type="button" class="tab-btn" onclick="showTab('liquidaciones')">💰 Liquidaciones</button>
+                <button type="button" class="tab-btn" onclick="showTab('gps')">🛰️ GPS</button>
                 <button type="button" class="tab-btn" onclick="showTab('admin')">💼 Admin</button>
             </div>
 
@@ -146,6 +148,15 @@
                 <div id="liquidacionesList" class="card-grid"></div>
             </div>
 
+            <!-- TAB GPS -->
+            <div id="tabGps" class="tab-content" style="display:none;">
+                <div class="action-bar">
+                    <h3>🛰️ Usuarios activos con GPS</h3>
+                    <button type="button" onclick="cargarVistaGps()" class="btn-primary">Actualizar</button>
+                </div>
+                <div id="vistaGps" class="card-grid"></div>
+            </div>
+
             <!-- TAB ADMIN -->
             <div id="tabAdmin" class="tab-content" style="display:none;">
                 <div class="action-bar">
@@ -172,7 +183,6 @@
                 </div>
             </div>
 
-            <!-- Estado y estadísticas del repartidor -->
             <div class="stats-bar">
                 <div class="stat-card">
                     <span id="vehiculoUsuario">🚲 Bici</span>
@@ -189,28 +199,30 @@
                         🟢 Disponible
                     </button>
                 </div>
+                <div class="stat-card">
+                    <span id="gpsUsuario">📍 GPS desactivado</span>
+                </div>
+                <div class="stat-card">
+                    <span id="ubicacionUsuario">Sin datos</span>
+                </div>
             </div>
 
-            <!-- Tabs del repartidor -->
             <div class="tabs">
                 <button type="button" class="tab-btn active" onclick="showUserTab('pendientes')">📋 Pendientes</button>
                 <button type="button" class="tab-btn" onclick="showUserTab('misPedidos')">📦 Mis Pedidos</button>
                 <button type="button" class="tab-btn" onclick="showUserTab('historial')">📜 Historial</button>
             </div>
 
-            <!-- TAB PENDIENTES -->
             <div id="userTabPendientes" class="tab-content">
                 <h3>📋 Pedidos Disponibles</h3>
                 <div id="pedidosPendientes" class="card-grid"></div>
             </div>
 
-            <!-- TAB MIS PEDIDOS -->
             <div id="userTabMisPedidos" class="tab-content" style="display:none;">
                 <h3>📦 Mis Pedidos Asignados</h3>
                 <div id="misPedidos" class="card-grid"></div>
             </div>
 
-            <!-- TAB HISTORIAL -->
             <div id="userTabHistorial" class="tab-content" style="display:none;">
                 <h3>📜 Historial de Pedidos Completados</h3>
                 <div id="historialPedidos" class="card-grid"></div>

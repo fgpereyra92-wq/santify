@@ -1,0 +1,7 @@
+# Backups manuales (ya no hacen falta, git guarda el historial)
+*.rar
+archivado/
+archivos 2026 07 29/
+
+# Datos de prueba locales, no usados por la app
+datos.json

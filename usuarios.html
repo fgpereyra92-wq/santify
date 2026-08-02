@@ -11,13 +11,17 @@
 </head>
 <body>
     <div class="container">
-        <div class="site-branding" style="text-align:center;margin:18px 0;">
-            <img id="siteLogo" alt="Logo" style="max-width:140px;display:none;margin:0 auto;" />
-        </div>
         <!-- ===== LOGIN USUARIO ===== -->
         <div id="loginUsuarioSection" class="section">
             <div class="login-box">
-                <h1>🚚 Panel de Repartidor</h1>
+                <div class="brand">
+                    <img class="appLogo" src="logo.png" alt="Pedidos San">
+                    <div>
+                        <h1>Pedidos San</h1>
+                        <h2>Repartidores</h2>
+                    </div>
+                </div>
+                <h1 style="font-size:1.7rem;">🚚 Repartidores</h1>
                 <p style="text-align:center;color:#888;margin-bottom:20px;font-size:0.9rem;">
                     Toca la pantalla para activar el sonido 🔊
                 </p>
@@ -86,50 +90,6 @@
             </div>
         </div>
     </div>
-
-        <script>
-        (function(){
-            const logoEl = document.getElementById('siteLogo');
-            if(!logoEl) return;
-            const candidates = [
-                'logo.png',
-                'logos/logo.png',
-                'logos/logo 4.png',
-                'logos/logo 1.png',
-                'logos/logo 2.jpg',
-                'logos/logo 3.jpg',
-                'logos/logo 5.png'
-            ];
-            function tryLoad(idx){
-                if(idx>=candidates.length) return;
-                const path = candidates[idx];
-                const url = encodeURI(path);
-                const img = new Image();
-                img.onload = () => { logoEl.src = url; logoEl.style.display = 'block'; };
-                img.onerror = () => {
-                    const ghRaw = resolveGitHubRawUrl(path);
-                    if(ghRaw){
-                        const img2 = new Image();
-                        img2.onload = ()=> { logoEl.src = encodeURI(ghRaw); logoEl.style.display = 'block'; };
-                        img2.onerror = ()=> tryLoad(idx+1);
-                        img2.src = encodeURI(ghRaw);
-                    } else {
-                        tryLoad(idx+1);
-                    }
-                };
-                img.src = url;
-            }
-            function resolveGitHubRawUrl(path){
-                const host = location.hostname;
-                if(!host.endsWith('github.io')) return null;
-                const username = host.split('.')[0];
-                const parts = location.pathname.split('/').filter(Boolean);
-                const repo = parts[0] || username;
-                return `https://raw.githubusercontent.com/${username}/${repo}/main/${path}`;
-            }
-            tryLoad(0);
-        })();
-        </script>
 
         <script src="firebase-config.js"></script>
         <script src="app.js"></script>

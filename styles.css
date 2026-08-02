@@ -153,28 +153,29 @@ body {
 }
 
 /* ===== BRAND / LOGO ===== */
-.brand {
+.brand, .login-box__brand {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
 .appLogo {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     object-fit: contain;
-    border-radius: 50%;
-    background: transparent;
+    border-radius: 14px;
+    background: #111;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+    border: 1px solid #2a2a2a;
 }
 
-.brand h1 {
+.brand h1, .login-box__brand h1 {
     color: #ff6b35;
     margin: 0;
     font-size: 1.25rem;
 }
 
-.brand h2 {
+.brand h2, .login-box__brand h2 {
     color: #888;
     margin: 0;
     font-size: 0.95rem;

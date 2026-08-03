@@ -196,9 +196,11 @@ async function cargarPedidos() {
     
     const sel = document.getElementById('usuarioAsignado');
     if (sel) {
+        const valorPrevio = sel.value;
         const activos = usuariosCache.filter(u => u.activo);
-        sel.innerHTML = '<option value="">Sin asignar</option>' + 
+        sel.innerHTML = '<option value="">Sin asignar</option>' +
             activos.map(u => `<option value="${u.id}">${u.nombre} (${u.vehiculo})</option>`).join('');
+        if (valorPrevio && activos.some(u => String(u.id) === valorPrevio)) sel.value = valorPrevio;
     }
 }
 
@@ -210,9 +212,11 @@ async function cargarClientes() {
     
     const sel = document.getElementById('clienteOrigen');
     if (sel) {
+        const valorPrevio = sel.value;
         const activos = clientesCache.filter(c => c.activo);
-        sel.innerHTML = '<option value="">Seleccionar cliente</option>' + 
+        sel.innerHTML = '<option value="">Seleccionar cliente</option>' +
             activos.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+        if (valorPrevio && activos.some(c => String(c.id) === valorPrevio)) sel.value = valorPrevio;
     }
 }
 

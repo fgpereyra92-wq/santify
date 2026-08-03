@@ -7,6 +7,8 @@ let usuarioActual = null;
 let usuariosCache = [];
 let pedidosCache = [];
 let clientesCache = [];
+let categoriasCache = [];
+let ofertasCache = [];
 let historialLiquidaciones = [];
 let liquidacionAdmin = { total: 0, historial: [] };
 let ultimoPedidoPendiente = null;
@@ -176,6 +178,8 @@ async function cargarDatosAdmin() {
         await cargarUsuarios();
         await cargarPedidos();
         await cargarClientes();
+        await cargarCategorias();
+        await cargarOfertas();
         await cargarHistorial();
         await cargarLiquidacionAdmin();
     } catch (e) { console.error('Error cargando datos admin:', e); }
@@ -798,6 +802,350 @@ async function eliminarCliente(id) {
 }
 
 // ============================================================
+// ===== CRUD CATEGORÍAS (landing estilo Netflix) =====
+// ============================================================
+
+async function cargarCategorias() {
+    const f = fb();
+    if (!f) return;
+    categoriasCache = (await f.getCategorias()).sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    renderCategorias(categoriasCache);
+}
+
+function renderCategorias(categorias) {
+    const container = document.getElementById('listaCategorias');
+    if (!container) return;
+    if (!categorias || categorias.length === 0) {
+        container.innerHTML = '<div class="list-shell"><p>No hay categorías todavía</p></div>';
+        return;
+    }
+    container.innerHTML = `
+        <div class="list-shell">
+            <div class="list-section-title">Categorías</div>
+            ${categorias.map(cat => `
+                <div class="list-row">
+                    <div class="list-row-main">
+                        <strong>${cat.nombre}</strong>
+                        <div>Orden: ${cat.orden || 0}</div>
+                    </div>
+                    <div class="list-row-actions">
+                        <button onclick="editarCategoria(${cat.id})" class="btn-secondary">✏️ Editar</button>
+                        <button onclick="eliminarCategoria(${cat.id})" class="btn-danger">Eliminar</button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+async function crearCategoria() {
+    const nombre = document.getElementById('categoriaNombre').value;
+    const orden = document.getElementById('categoriaOrden').value;
+    if (!nombre) { alert('El nombre es obligatorio'); return; }
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    const id = await f.getNextId('categorias');
+    await f.setCategoria(id, { nombre, orden: orden ? parseInt(orden) : 0 });
+    hideForm('categoria');
+    document.getElementById('categoriaNombre').value = '';
+    document.getElementById('categoriaOrden').value = '0';
+    await cargarCategorias();
+}
+
+function editarCategoria(id) {
+    const cat = categoriasCache.find(c => c.id === id);
+    if (!cat) { alert('Categoría no encontrada'); return; }
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;z-index:1000;padding:20px;';
+    modal.innerHTML = `
+        <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;max-width:420px;width:100%;padding:25px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a2a;padding-bottom:15px;margin-bottom:20px;">
+                <h2 style="color:#ff6b35;margin:0;">✏️ Editar Categoría</h2>
+                <button onclick="this.closest('.modal-overlay').remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">✕</button>
+            </div>
+            <input type="text" id="editCategoriaNombre" placeholder="Nombre" class="input-field" value="${cat.nombre || ''}">
+            <input type="number" id="editCategoriaOrden" placeholder="Orden" class="input-field" value="${cat.orden || 0}">
+            <div class="form-actions">
+                <button type="button" onclick="guardarEdicionCategoria(${id})" class="btn-primary">Guardar</button>
+                <button type="button" onclick="this.closest('.modal-overlay').remove()" class="btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function guardarEdicionCategoria(id) {
+    const cat = categoriasCache.find(c => c.id === id);
+    if (!cat) return;
+    const nombre = document.getElementById('editCategoriaNombre').value;
+    const orden = document.getElementById('editCategoriaOrden').value;
+    if (!nombre) { alert('El nombre es obligatorio'); return; }
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+    await f.setCategoria(id, { ...cat, nombre, orden: orden ? parseInt(orden) : 0 });
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) modal.remove();
+    await cargarCategorias();
+}
+
+async function eliminarCategoria(id) {
+    const enUso = ofertasCache.some(o => o.categoriaId === id);
+    const mensaje = enUso
+        ? 'Hay ofertas usando esta categoría. ¿Eliminar igual? (esas ofertas quedarán sin categoría)'
+        : '¿Eliminar categoría?';
+    if (!confirm(mensaje)) return;
+    const f = fb();
+    if (!f) return;
+    await f.deleteCategoria(id);
+    await cargarCategorias();
+}
+
+// ============================================================
+// ===== CRUD OFERTAS (los "pósters" de la landing) =====
+// ============================================================
+
+async function cargarOfertas() {
+    const f = fb();
+    if (!f) return;
+    ofertasCache = await f.getOfertas();
+    renderOfertas(ofertasCache);
+
+    const selCliente = document.getElementById('ofertaClienteId');
+    if (selCliente) {
+        const valorPrevio = selCliente.value;
+        const activos = clientesCache.filter(c => c.activo);
+        selCliente.innerHTML = '<option value="">Seleccionar local (cliente)</option>' +
+            activos.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+        if (valorPrevio && activos.some(c => String(c.id) === valorPrevio)) selCliente.value = valorPrevio;
+    }
+    const selCategoria = document.getElementById('ofertaCategoriaId');
+    if (selCategoria) {
+        const valorPrevio = selCategoria.value;
+        selCategoria.innerHTML = '<option value="">Seleccionar categoría</option>' +
+            categoriasCache.map(cat => `<option value="${cat.id}">${cat.nombre}</option>`).join('');
+        if (valorPrevio && categoriasCache.some(cat => String(cat.id) === valorPrevio)) selCategoria.value = valorPrevio;
+    }
+}
+
+function renderOfertas(ofertas) {
+    const container = document.getElementById('listaOfertas');
+    if (!container) return;
+    if (!ofertas || ofertas.length === 0) {
+        container.innerHTML = '<div class="list-shell"><p>No hay ofertas todavía</p></div>';
+        return;
+    }
+    container.innerHTML = `
+        <div class="list-shell">
+            <div class="list-section-title">Ofertas</div>
+            ${ofertas.map(o => {
+                const cliente = clientesCache.find(c => c.id === o.clienteId);
+                const categoria = categoriasCache.find(cat => cat.id === o.categoriaId);
+                const miniatura = o.imagenUrl
+                    ? `<img src="${o.imagenUrl}" alt="${o.titulo}" style="width:60px;height:90px;object-fit:cover;border-radius:6px;border:1px solid #2a2a2a;flex-shrink:0;">`
+                    : `<div style="width:60px;height:90px;background:#2a2a2a;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#666;font-size:0.65rem;text-align:center;">Sin flyer</div>`;
+                return `
+                    <div class="list-row">
+                        <div class="list-row-main" style="display:flex;align-items:center;gap:12px;">
+                            ${miniatura}
+                            <div>
+                                <strong>${o.titulo}</strong>
+                                <div>🏢 ${cliente ? cliente.nombre : 'Local eliminado'}</div>
+                                <div>🎬 ${categoria ? categoria.nombre : 'Sin categoría'}</div>
+                                ${o.precio != null ? `<div>💰 $${o.precio}</div>` : ''}
+                                <div class="badge ${o.activo ? 'badge-active' : 'badge-inactive'}">${o.activo ? '✅ Activo' : '❌ Inactivo'}</div>
+                            </div>
+                        </div>
+                        <div class="list-row-actions">
+                            <button onclick="editarOferta(${o.id})" class="btn-secondary">✏️ Editar</button>
+                            <button onclick="toggleOfertaActivo(${o.id})" class="${o.activo ? 'btn-danger' : 'btn-success'}">${o.activo ? 'Desactivar' : 'Activar'}</button>
+                            <button onclick="eliminarOferta(${o.id})" class="btn-danger">Eliminar</button>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function previsualizarImagenOferta(event) {
+    const preview = document.getElementById('ofertaImagenPreview');
+    if (!preview) return;
+    const file = event.target.files[0];
+    if (!file) { preview.style.display = 'none'; return; }
+    const img = preview.querySelector('img');
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(file);
+}
+
+// Redimensiona y comprime la imagen en el navegador (formato flyer de cine)
+// y la devuelve como data URL, para guardarla directo en la base de datos
+// sin depender de Firebase Storage.
+function redimensionarImagenOferta(file, maxAncho = 500, maxAlto = 750, calidad = 0.8) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                const escala = Math.min(maxAncho / img.width, maxAlto / img.height, 1);
+                const ancho = Math.round(img.width * escala);
+                const alto = Math.round(img.height * escala);
+                const canvas = document.createElement('canvas');
+                canvas.width = ancho;
+                canvas.height = alto;
+                canvas.getContext('2d').drawImage(img, 0, 0, ancho, alto);
+                resolve(canvas.toDataURL('image/jpeg', calidad));
+            };
+            img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+            img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+        reader.readAsDataURL(file);
+    });
+}
+
+async function crearOferta() {
+    const clienteId = document.getElementById('ofertaClienteId').value;
+    const categoriaId = document.getElementById('ofertaCategoriaId').value;
+    const titulo = document.getElementById('ofertaTitulo').value;
+    const descripcion = document.getElementById('ofertaDescripcion').value;
+    const precio = document.getElementById('ofertaPrecio').value;
+    const fileInput = document.getElementById('ofertaImagenInput');
+    const file = fileInput && fileInput.files[0];
+
+    if (!clienteId || !categoriaId || !titulo) { alert('Local, categoría y título son obligatorios'); return; }
+
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+
+    const id = await f.getNextId('ofertas');
+    let imagenUrl = '';
+    if (file) {
+        try {
+            imagenUrl = await redimensionarImagenOferta(file);
+        } catch (error) {
+            console.error('Error procesando imagen:', error);
+            alert('⚠️ No se pudo procesar la imagen. La oferta se guarda sin flyer, podés editarla luego para agregarlo.');
+        }
+    }
+
+    await f.setOferta(id, {
+        clienteId: parseInt(clienteId),
+        categoriaId: parseInt(categoriaId),
+        titulo,
+        descripcion,
+        precio: precio ? parseFloat(precio) : null,
+        imagenUrl,
+        activo: true
+    });
+
+    hideForm('oferta');
+    ['ofertaTitulo', 'ofertaDescripcion', 'ofertaPrecio'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('ofertaClienteId').value = '';
+    document.getElementById('ofertaCategoriaId').value = '';
+    if (fileInput) fileInput.value = '';
+    const preview = document.getElementById('ofertaImagenPreview');
+    if (preview) preview.style.display = 'none';
+
+    await cargarOfertas();
+    alert('✅ Oferta creada correctamente');
+}
+
+function editarOferta(id) {
+    const o = ofertasCache.find(o => o.id === id);
+    if (!o) { alert('Oferta no encontrada'); return; }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;justify-content:center;align-items:center;z-index:1000;padding:20px;';
+    modal.innerHTML = `
+        <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;padding:25px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #2a2a2a;padding-bottom:15px;margin-bottom:20px;">
+                <h2 style="color:#ff6b35;margin:0;">✏️ Editar Oferta</h2>
+                <button onclick="this.closest('.modal-overlay').remove()" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;">✕</button>
+            </div>
+            <select id="editOfertaClienteId" class="input-field">
+                <option value="">Seleccionar local (cliente)</option>
+                ${clientesCache.filter(c => c.activo).map(c => `<option value="${c.id}" ${c.id === o.clienteId ? 'selected' : ''}>${c.nombre}</option>`).join('')}
+            </select>
+            <select id="editOfertaCategoriaId" class="input-field">
+                <option value="">Seleccionar categoría</option>
+                ${categoriasCache.map(cat => `<option value="${cat.id}" ${cat.id === o.categoriaId ? 'selected' : ''}>${cat.nombre}</option>`).join('')}
+            </select>
+            <input type="text" id="editOfertaTitulo" placeholder="Título" class="input-field" value="${o.titulo || ''}">
+            <textarea id="editOfertaDescripcion" placeholder="Descripción" class="input-field" rows="3">${o.descripcion || ''}</textarea>
+            <input type="number" id="editOfertaPrecio" placeholder="Precio (opcional)" class="input-field" value="${o.precio != null ? o.precio : ''}">
+            ${o.imagenUrl ? `<img src="${o.imagenUrl}" alt="${o.titulo}" style="width:120px;border-radius:8px;border:1px solid #2a2a2a;margin:10px 0;display:block;">` : ''}
+            <label style="display:block;margin:10px 0 4px;color:#b0b0b0;font-size:0.9rem;">Reemplazar imagen (opcional)</label>
+            <input type="file" id="editOfertaImagenInput" accept="image/*" class="input-field">
+            <div class="form-actions">
+                <button type="button" onclick="guardarEdicionOferta(${id})" class="btn-primary">Guardar</button>
+                <button type="button" onclick="this.closest('.modal-overlay').remove()" class="btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function guardarEdicionOferta(id) {
+    const o = ofertasCache.find(o => o.id === id);
+    if (!o) return;
+    const clienteId = document.getElementById('editOfertaClienteId').value;
+    const categoriaId = document.getElementById('editOfertaCategoriaId').value;
+    const titulo = document.getElementById('editOfertaTitulo').value;
+    const descripcion = document.getElementById('editOfertaDescripcion').value;
+    const precio = document.getElementById('editOfertaPrecio').value;
+    const fileInput = document.getElementById('editOfertaImagenInput');
+    const file = fileInput && fileInput.files[0];
+    if (!clienteId || !categoriaId || !titulo) { alert('Local, categoría y título son obligatorios'); return; }
+
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+
+    let imagenUrl = o.imagenUrl || '';
+    if (file) {
+        try {
+            imagenUrl = await redimensionarImagenOferta(file);
+        } catch (error) {
+            console.error('Error procesando imagen:', error);
+            alert('⚠️ No se pudo procesar la imagen nueva, se mantiene la anterior.');
+        }
+    }
+
+    await f.setOferta(id, {
+        ...o,
+        clienteId: parseInt(clienteId),
+        categoriaId: parseInt(categoriaId),
+        titulo,
+        descripcion,
+        precio: precio ? parseFloat(precio) : null,
+        imagenUrl
+    });
+
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) modal.remove();
+    await cargarOfertas();
+}
+
+async function toggleOfertaActivo(id) {
+    const o = ofertasCache.find(o => o.id === id);
+    if (!o) return;
+    const f = fb();
+    if (!f) return;
+    await f.setOferta(id, { ...o, activo: !o.activo });
+    await cargarOfertas();
+}
+
+async function eliminarOferta(id) {
+    if (!confirm('¿Eliminar oferta?')) return;
+    const f = fb();
+    if (!f) return;
+    await f.deleteOferta(id);
+    await cargarOfertas();
+}
+
+// ============================================================
 // ===== CRUD PEDIDOS =====
 // ============================================================
 
@@ -1400,7 +1748,7 @@ function activarSonidoManual() {
 function showTab(tab) {
     document.querySelectorAll('.tab-content').forEach(el => { if (el) el.style.display = 'none'; });
     document.querySelectorAll('.tab-btn').forEach(el => { if (el) el.classList.remove('active'); });
-    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'gps', 'admin'];
+    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'gps', 'categorias', 'ofertas', 'admin'];
     const idx = tabs.indexOf(tab);
     if (idx >= 0) {
         const el = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
@@ -1412,6 +1760,8 @@ function showTab(tab) {
         else if (tab === 'pedidos') cargarPedidos();
         else if (tab === 'liquidaciones') cargarLiquidaciones();
         else if (tab === 'gps') cargarVistaGps();
+        else if (tab === 'categorias') cargarCategorias();
+        else if (tab === 'ofertas') cargarOfertas();
         else if (tab === 'admin') cargarLiquidacionAdmin();
     }
 }

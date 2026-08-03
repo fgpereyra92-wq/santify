@@ -83,6 +83,8 @@
                 <button type="button" class="tab-btn" onclick="showTab('pedidos')">📦 Pedidos</button>
                 <button type="button" class="tab-btn" onclick="showTab('liquidaciones')">💰 Liquidaciones</button>
                 <button type="button" class="tab-btn" onclick="showTab('gps')">🛰️ GPS</button>
+                <button type="button" class="tab-btn" onclick="showTab('categorias')">🎬 Categorías</button>
+                <button type="button" class="tab-btn" onclick="showTab('ofertas')">🍿 Ofertas</button>
                 <button type="button" class="tab-btn" onclick="showTab('admin')">💼 Admin</button>
             </div>
 
@@ -171,6 +173,56 @@
                     <button type="button" onclick="cargarVistaGps()" class="btn-primary">Actualizar</button>
                 </div>
                 <div id="vistaGps" class="card-grid"></div>
+            </div>
+
+            <!-- TAB CATEGORÍAS (géneros estilo Netflix para la landing) -->
+            <div id="tabCategorias" class="tab-content" style="display:none;">
+                <div class="action-bar">
+                    <h3>Categorías de la Landing</h3>
+                    <button type="button" onclick="showForm('categoria')" class="btn-success">+ Nueva Categoría</button>
+                </div>
+                <div id="categoriaForm" class="form-container" style="display:none;">
+                    <h4>Crear Nueva Categoría</h4>
+                    <input type="text" id="categoriaNombre" placeholder="Nombre (ej: Parrilla, Pizza, Postres)" class="input-field">
+                    <input type="number" id="categoriaOrden" placeholder="Orden (menor = aparece primero)" class="input-field" value="0">
+                    <div class="form-actions">
+                        <button type="button" onclick="crearCategoria()" class="btn-primary">Guardar</button>
+                        <button type="button" onclick="hideForm('categoria')" class="btn-secondary">Cancelar</button>
+                    </div>
+                </div>
+                <div id="listaCategorias" class="card-grid"></div>
+            </div>
+
+            <!-- TAB OFERTAS (los "pósters" de la landing) -->
+            <div id="tabOfertas" class="tab-content" style="display:none;">
+                <div class="action-bar">
+                    <h3>Ofertas Gastronómicas</h3>
+                    <button type="button" onclick="showForm('oferta')" class="btn-success">+ Nueva Oferta</button>
+                </div>
+                <div id="ofertaForm" class="form-container" style="display:none;">
+                    <h4>Crear Nueva Oferta</h4>
+                    <select id="ofertaClienteId" class="input-field">
+                        <option value="">Seleccionar local (cliente)</option>
+                    </select>
+                    <select id="ofertaCategoriaId" class="input-field">
+                        <option value="">Seleccionar categoría</option>
+                    </select>
+                    <input type="text" id="ofertaTitulo" placeholder="Título de la oferta (ej: Parrillada Familiar)" class="input-field">
+                    <textarea id="ofertaDescripcion" placeholder="Descripción" class="input-field" rows="3"></textarea>
+                    <input type="number" id="ofertaPrecio" placeholder="Precio (opcional)" class="input-field">
+                    <label style="display:block;margin:10px 0 4px;color:#b0b0b0;font-size:0.9rem;">
+                        Imagen tipo flyer de cine (vertical, ideal 500x750px)
+                    </label>
+                    <input type="file" id="ofertaImagenInput" accept="image/*" class="input-field" onchange="previsualizarImagenOferta(event)">
+                    <div id="ofertaImagenPreview" style="display:none;margin:10px 0;">
+                        <img src="" alt="Preview" style="width:120px;border-radius:8px;border:1px solid #2a2a2a;">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" onclick="crearOferta()" class="btn-primary">Guardar</button>
+                        <button type="button" onclick="hideForm('oferta')" class="btn-secondary">Cancelar</button>
+                    </div>
+                </div>
+                <div id="listaOfertas" class="card-grid"></div>
             </div>
 
             <!-- TAB ADMIN -->

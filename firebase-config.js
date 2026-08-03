@@ -315,6 +315,58 @@ async function deleteCliente(id) {
 }
 
 // ============================================================
+// 📦 CRUD — CATEGORÍAS (landing estilo Netflix)
+// ============================================================
+
+async function getCategorias() {
+    try {
+        const snapshot = await database.ref('categorias').once('value');
+        const data = snapshot.val();
+        if (!data) return [];
+        return Object.keys(data).map(key => ({ id: parseInt(key), ...data[key] }));
+    } catch (error) {
+        console.error('Error obteniendo categorías:', error);
+        return [];
+    }
+}
+
+async function setCategoria(id, data) {
+    await database.ref(`categorias/${id}`).set(data);
+    return { id, ...data };
+}
+
+async function deleteCategoria(id) {
+    await database.ref(`categorias/${id}`).remove();
+    return true;
+}
+
+// ============================================================
+// 📦 CRUD — OFERTAS (los "pósters" de la landing)
+// ============================================================
+
+async function getOfertas() {
+    try {
+        const snapshot = await database.ref('ofertas').once('value');
+        const data = snapshot.val();
+        if (!data) return [];
+        return Object.keys(data).map(key => ({ id: parseInt(key), ...data[key] }));
+    } catch (error) {
+        console.error('Error obteniendo ofertas:', error);
+        return [];
+    }
+}
+
+async function setOferta(id, data) {
+    await database.ref(`ofertas/${id}`).set(data);
+    return { id, ...data };
+}
+
+async function deleteOferta(id) {
+    await database.ref(`ofertas/${id}`).remove();
+    return true;
+}
+
+// ============================================================
 // 📦 LIQUIDACIONES
 // ============================================================
 
@@ -397,6 +449,12 @@ window.firebaseFunctions = {
     getClientes,
     setCliente,
     deleteCliente,
+    getCategorias,
+    setCategoria,
+    deleteCategoria,
+    getOfertas,
+    setOferta,
+    deleteOferta,
     getHistorial,
     setHistorial,
     getLiquidacionAdmin,

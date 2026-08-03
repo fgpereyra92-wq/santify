@@ -1,4 +1,4 @@
-# 🚚 Gestor de Entregas v3.0
+# 🚚 Deliberisso
 
 Sistema de gestión de pedidos y entregas con notificaciones en tiempo real.
 
@@ -21,4 +21,4 @@ Sistema de gestión de pedidos y entregas con notificaciones en tiempo real.
 
 1. Clonar el repositorio:
 ```bash
-git clone https://github.com/tu-usuario/gestor-entregas.git
+git clone https://github.com/netunlock/santify.git

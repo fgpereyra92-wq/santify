@@ -551,7 +551,7 @@ function generarReporteTexto(usuarioId) {
     }
     
     reporte += `\n💵 *TOTAL A PAGAR: $${totalGeneral}*\n`;
-    reporte += `\n✅ Liquidación generada por Gestor de Entregas`;
+    reporte += `\n✅ Liquidación generada por Deliberisso`;
     
     return reporte;
 }
@@ -1950,7 +1950,7 @@ function hideForm(tipo) {
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚚 Gestor de Entregas v3.0');
+    console.log('🚚 Deliberisso');
     console.log('Admin: LedZepp1');
     console.log('Usuarios: carlos123, maria456, julio789');
     console.log('🔊 Para activar el sonido, toca el botón "Activar Sonido" o la pantalla');

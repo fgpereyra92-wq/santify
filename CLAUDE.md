@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Pedidos San — Gestor de Entregas v3.0. Sistema de gestión de pedidos/repartos: administración de repartidores (usuarios), clientes, pedidos, liquidaciones de pago y seguimiento GPS en tiempo real, con notificaciones sonoras cuando entra un pedido nuevo.
+Deliberisso (rebranded from "Pedidos San" / "Santify" in 2026-08). Sistema de gestión de pedidos/repartos: administración de repartidores (usuarios), clientes, pedidos, liquidaciones de pago y seguimiento GPS en tiempo real, con notificaciones sonoras cuando entra un pedido nuevo. También incluye una landing pública estilo Netflix (`landing.html`) donde los clientes eligen ofertas gastronómicas y piden por WhatsApp directo al local.
+
+**Sobre el nombre**: el Firebase Project ID (`santify-19aee`) y el repo de GitHub (`netunlock/santify`) siguen usando el nombre anterior — son identificadores técnicos inmutables/de bajo riesgo para renombrar, no texto de marca. Todo lo visible para el usuario (títulos, headers, mensajes) ya dice "Deliberisso".
 
 ## Commands
 

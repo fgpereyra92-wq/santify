@@ -2,7 +2,7 @@
 // ===== SERVICE WORKER PARA NOTIFICACIONES PUSH =====
 // ============================================================
 
-const CACHE_NAME = 'gestor-entregas-v1';
+const CACHE_NAME = 'deliberisso-v1';
 const urlsToCache = [
     '/',
     '/index.html',

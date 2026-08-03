@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos San | Ofertas Gastronómicas</title>
+    <title>Deliberisso | Ofertas Gastronómicas</title>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
@@ -203,9 +203,9 @@
 <body>
     <div class="page">
         <div class="hero">
-            <img class="appLogo" src="logo.png" alt="Pedidos San Logo">
+            <img class="appLogo" src="logo.png" alt="Deliberisso Logo">
             <div>
-                <h1>Pedidos San</h1>
+                <h1>Deliberisso</h1>
                 <h2>Elegí qué comer hoy</h2>
             </div>
         </div>
@@ -288,7 +288,7 @@
             if (!o) return;
             const cliente = clientesCache.find(c => c.id === o.clienteId);
             const telefono = cliente && cliente.telefono ? cliente.telefono.replace(/\D/g, '') : '';
-            const mensaje = encodeURIComponent(`Hola! Vi "${o.titulo}"${cliente ? ' de ' + cliente.nombre : ''} en Pedidos San y quiero pedirlo.`);
+            const mensaje = encodeURIComponent(`Hola! Vi "${o.titulo}"${cliente ? ' de ' + cliente.nombre : ''} en Deliberisso y quiero pedirlo.`);
 
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';

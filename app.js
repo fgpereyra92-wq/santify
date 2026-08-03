@@ -1934,13 +1934,13 @@ function seleccionarUsuarioGPS(id) {
 
 
 function showForm(tipo) {
-    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm' };
+    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm', categoria: 'categoriaForm', oferta: 'ofertaForm' };
     const el = document.getElementById(map[tipo]);
     if (el) el.style.display = 'block';
 }
 
 function hideForm(tipo) {
-    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm' };
+    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm', categoria: 'categoriaForm', oferta: 'ofertaForm' };
     const el = document.getElementById(map[tipo]);
     if (el) el.style.display = 'none';
 }

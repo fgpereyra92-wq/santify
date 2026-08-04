@@ -11,318 +11,665 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
-    <script>
-        // Marcar el contexto de ruta para que app.js lo sepa
-        window.currentRoute = window.location.pathname;
-    </script>
+    <style>
+        /* Landing styles */
+        .landing-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 16px 60px;
+        }
+        .landing-hero {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .landing-hero .appLogo {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            object-fit: contain;
+            background: #111;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+            border: 1px solid #232323;
+        }
+        .landing-hero h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: #ff6b35;
+            line-height: 1.1;
+        }
+        .landing-hero h2 {
+            margin: 4px 0 0;
+            font-size: 0.95rem;
+            color: #c8c8c8;
+            font-weight: 400;
+        }
+        .estado-carga, .sin-ofertas {
+            text-align: center;
+            color: #888;
+            padding: 60px 20px;
+            font-size: 1.05rem;
+        }
+        .categoria-row {
+            margin-bottom: 36px;
+        }
+        .categoria-titulo {
+            color: #ff6b35;
+            font-size: 1.25rem;
+            margin: 0 0 12px 2px;
+            font-weight: 700;
+        }
+        .poster-scroll {
+            display: flex;
+            gap: 14px;
+            overflow-x: auto;
+            padding: 4px 2px 12px;
+            scroll-snap-type: x proximity;
+        }
+        .poster-scroll::-webkit-scrollbar { height: 8px; }
+        .poster-scroll::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 8px; }
+        .poster-card {
+            flex: 0 0 auto;
+            width: 150px;
+            cursor: pointer;
+            scroll-snap-align: start;
+            transition: transform 0.2s ease;
+        }
+        .poster-card:hover { transform: scale(1.05); }
+        .poster-img {
+            width: 150px;
+            height: 225px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid #232323;
+            display: block;
+        }
+        .poster-placeholder {
+            background: #151515;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+        }
+        .poster-titulo {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            color: #e8e8e8;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        .poster-local {
+            font-size: 0.78rem;
+            color: #888;
+            margin-top: 2px;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal-card {
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            border-radius: 16px;
+            max-width: 420px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 0 0 24px;
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            top: 12px; right: 12px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 34px; height: 34px;
+            font-size: 1rem;
+            cursor: pointer;
+            z-index: 1;
+        }
+        .modal-img {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            object-fit: cover;
+            border-radius: 16px 16px 0 0;
+        }
+        .modal-body { padding: 20px 22px 0; }
+        .modal-titulo {
+            margin: 0 0 4px;
+            color: #fff;
+            font-size: 1.3rem;
+        }
+        .modal-local {
+            margin: 0 0 14px;
+            color: #ff6b35;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+        .modal-desc {
+            color: #c8c8c8;
+            line-height: 1.6;
+            margin: 0 0 14px;
+        }
+        .modal-precio {
+            color: #28a745;
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 0 0 18px;
+        }
+        .btn-whatsapp {
+            display: inline-flex;
+            width: 100%;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            background: #25d366;
+            color: #111;
+            text-decoration: none;
+            font-weight: 700;
+            border-radius: 999px;
+            padding: 14px 26px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 10px 28px rgba(37, 211, 102, 0.25);
+        }
+        .btn-whatsapp:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 32px rgba(37, 211, 102, 0.32);
+        }
+        .sin-whatsapp {
+            color: #888;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        
-        <!-- ============================================ -->
-        <!-- ===== LOGIN ADMIN ===== -->
-        <!-- ============================================ -->
-        <div id="loginSection" class="section">
-            <div class="login-box">
-                <div class="brand">
-                    <img class="appLogo" src="logo.png" alt="Deliberisso">
-                    <div>
-                        <h1>Deliberisso</h1>
-                        <h2>Panel de Administración</h2>
-                    </div>
+    <!-- LANDING SECTION -->
+    <div id="landingSection" style="display: none;">
+        <div class="landing-container">
+            <div class="landing-hero">
+                <img class="appLogo" src="logo.png" alt="Deliberisso Logo">
+                <div>
+                    <h1>Deliberisso</h1>
+                    <h2>Elegí qué comer hoy</h2>
                 </div>
-                <input type="password" id="adminPassword" placeholder="Clave de Administrador" class="input-field">
-                <button type="button" onclick="loginAdmin()" class="btn-primary">Ingresar</button>
-                <div id="loginError" class="error-message"></div>
-                
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
-                    <p style="text-align: center; margin-bottom: 15px;">¿Eres repartidor?</p>
-                    <button type="button" onclick="mostrarLoginUsuario()" class="btn-secondary" style="width: 100%;">
-                        👤 Ingresar como Repartidor
-                    </button>
-                </div>
+            </div>
+            <div id="categoriasContainer">
+                <div class="estado-carga">Cargando ofertas...</div>
             </div>
         </div>
-
-        <!-- ============================================ -->
-        <!-- ===== LOGIN USUARIO (REPARTIDOR) ===== -->
-        <!-- ============================================ -->
-        <div id="loginUsuarioSection" class="section" style="display:none;">
-            <div class="login-box">
-                <div class="brand">
-                    <img class="appLogo" src="logo.png" alt="Deliberisso">
-                    <div>
-                        <h1>Deliberisso</h1>
-                        <h2>Panel de Repartidor</h2>
-                    </div>
-                </div>
-                <input type="text" id="userLogin" placeholder="Usuario" class="input-field">
-                <input type="password" id="userPass" placeholder="Contraseña" class="input-field">
-                <button type="button" onclick="loginUsuario()" class="btn-primary">Ingresar</button>
-                <div id="userLoginError" class="error-message"></div>
-                
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
-                    <p style="text-align: center; margin-bottom: 15px;">¿Eres administrador?</p>
-                    <button type="button" onclick="mostrarLoginAdmin()" class="btn-secondary" style="width: 100%;">
-                        👨‍💼 Ingresar como Administrador
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- ===== PANEL ADMIN ===== -->
-        <!-- ============================================ -->
-        <div id="adminPanel" class="section" style="display:none;">
-            <div class="admin-header">
-                <div class="brand">
-                    <img class="appLogo" src="logo.png" alt="Deliberisso">
-                    <h1>Deliberisso — Panel de Administración</h1>
-                </div>
-                <button type="button" onclick="logout()" class="btn-danger">Cerrar Sesión</button>
-            </div>
-
-            <div class="tabs">
-                <button type="button" class="tab-btn active" onclick="showTab('usuarios')">👥 Usuarios</button>
-                <button type="button" class="tab-btn" onclick="showTab('clientes')">🏢 Clientes</button>
-                <button type="button" class="tab-btn" onclick="showTab('pedidos')">📦 Pedidos</button>
-                <button type="button" class="tab-btn" onclick="showTab('liquidaciones')">💰 Liquidaciones</button>
-                <button type="button" class="tab-btn" onclick="showTab('gps')">🛰️ GPS</button>
-                <button type="button" class="tab-btn" onclick="showTab('categorias')">🎬 Categorías</button>
-                <button type="button" class="tab-btn" onclick="showTab('ofertas')">🍿 Ofertas</button>
-                <button type="button" class="tab-btn" onclick="showTab('admin')">💼 Admin</button>
-            </div>
-
-            <!-- TAB USUARIOS -->
-            <div id="tabUsuarios" class="tab-content">
-                <div class="action-bar">
-                    <h3>Gestión de Usuarios</h3>
-                    <button type="button" onclick="showForm('usuario')" class="btn-success">+ Nuevo Usuario</button>
-                </div>
-                <div id="usuarioForm" class="form-container" style="display:none;">
-                    <h4>Crear Nuevo Usuario</h4>
-                    <input type="text" id="nombre" placeholder="Nombre completo" class="input-field">
-                    <input type="text" id="username" placeholder="Nombre de usuario" class="input-field">
-                    <input type="text" id="password" placeholder="Contraseña" class="input-field">
-                    <select id="vehiculo" class="input-field">
-                        <option value="bici">🚲 Bici</option>
-                        <option value="moto">🏍️ Moto</option>
-                        <option value="auto">🚗 Auto</option>
-                    </select>
-                    <div class="form-actions">
-                        <button type="button" onclick="crearUsuario()" class="btn-primary">Guardar</button>
-                        <button type="button" onclick="hideForm('usuario')" class="btn-secondary">Cancelar</button>
-                    </div>
-                </div>
-                <div id="listaUsuarios" class="card-grid"></div>
-            </div>
-
-            <!-- TAB CLIENTES -->
-            <div id="tabClientes" class="tab-content" style="display:none;">
-                <div class="action-bar">
-                    <h3>Gestión de Clientes</h3>
-                    <button type="button" onclick="showForm('cliente')" class="btn-success">+ Nuevo Cliente</button>
-                </div>
-                <div id="clienteForm" class="form-container" style="display:none;">
-                    <h4>Crear Nuevo Cliente</h4>
-                    <input type="text" id="clienteNombre" placeholder="Nombre del cliente" class="input-field">
-                    <input type="text" id="clienteDireccion" placeholder="Dirección" class="input-field">
-                    <input type="text" id="clienteTelefono" placeholder="Teléfono" class="input-field">
-                    <input type="email" id="clienteEmail" placeholder="Email" class="input-field">
-                    <input type="text" id="clienteReferencia" placeholder="Referencia / detalle (opcional)" class="input-field">
-                    <div class="form-actions">
-                        <button type="button" onclick="crearCliente()" class="btn-primary">Guardar</button>
-                        <button type="button" onclick="hideForm('cliente')" class="btn-secondary">Cancelar</button>
-                    </div>
-                </div>
-                <div id="listaClientes" class="card-grid"></div>
-            </div>
-
-            <!-- TAB PEDIDOS -->
-            <div id="tabPedidos" class="tab-content" style="display:none;">
-                <div class="action-bar">
-                    <h3>Gestión de Pedidos</h3>
-                    <button type="button" onclick="showForm('pedido')" class="btn-success">+ Nuevo Pedido</button>
-                </div>
-                <div id="pedidoForm" class="form-container" style="display:none;">
-                    <h4>Crear Nuevo Pedido</h4>
-                    <input type="text" id="descripcion" placeholder="Descripción del pedido" class="input-field">
-                    <select id="clienteOrigen" class="input-field">
-                        <option value="">Seleccionar cliente (origen)</option>
-                    </select>
-                    <input type="text" id="origenManual" placeholder="O escribir origen manual" class="input-field">
-                    <input type="text" id="destino" placeholder="Destino" class="input-field">
-                    <input type="number" id="costoServicio" placeholder="Costo del servicio" class="input-field">
-                    <input type="number" id="pagoRepartidor" placeholder="Pago al repartidor" class="input-field">
-                    <select id="usuarioAsignado" class="input-field">
-                        <option value="">Sin asignar</option>
-                    </select>
-                    <div class="form-actions">
-                        <button type="button" onclick="crearPedido()" class="btn-primary">Guardar</button>
-                        <button type="button" onclick="hideForm('pedido')" class="btn-secondary">Cancelar</button>
-                    </div>
-                </div>
-                <div id="listaPedidos" class="card-grid"></div>
-            </div>
-
-            <!-- TAB LIQUIDACIONES -->
-            <div id="tabLiquidaciones" class="tab-content" style="display:none;">
-                <h3>📊 Liquidaciones de Repartidores</h3>
-                <div id="liquidacionesList" class="card-grid"></div>
-            </div>
-
-            <!-- TAB GPS -->
-            <div id="tabGps" class="tab-content" style="display:none;">
-                <div class="action-bar">
-                    <h3>🛰️ Usuarios activos con GPS</h3>
-                    <button type="button" onclick="cargarVistaGps()" class="btn-primary">Actualizar</button>
-                </div>
-                <div id="vistaGps" class="card-grid"></div>
-            </div>
-
-            <!-- TAB CATEGORÍAS (géneros estilo Netflix para la landing) -->
-            <div id="tabCategorias" class="tab-content" style="display:none;">
-                <div class="action-bar">
-                    <h3>Categorías de la Landing</h3>
-                    <button type="button" onclick="showForm('categoria')" class="btn-success">+ Nueva Categoría</button>
-                </div>
-                <div id="categoriaForm" class="form-container" style="display:none;">
-                    <h4>Crear Nueva Categoría</h4>
-                    <input type="text" id="categoriaNombre" placeholder="Nombre (ej: Parrilla, Pizza, Postres)" class="input-field">
-                    <input type="number" id="categoriaOrden" placeholder="Orden (menor = aparece primero)" class="input-field" value="0">
-                    <div class="form-actions">
-                        <button type="button" onclick="crearCategoria()" class="btn-primary">Guardar</button>
-                        <button type="button" onclick="hideForm('categoria')" class="btn-secondary">Cancelar</button>
-                    </div>
-                </div>
-                <div id="listaCategorias" class="card-grid"></div>
-            </div>
-
-            <!-- TAB OFERTAS (los "pósters" de la landing) -->
-            <div id="tabOfertas" class="tab-content" style="display:none;">
-                <div class="action-bar">
-                    <h3>Ofertas Gastronómicas</h3>
-                    <button type="button" onclick="showForm('oferta')" class="btn-success">+ Nueva Oferta</button>
-                </div>
-                <div id="ofertaForm" class="form-container" style="display:none;">
-                    <h4>Crear Nueva Oferta</h4>
-                    <select id="ofertaClienteId" class="input-field">
-                        <option value="">Seleccionar local (cliente)</option>
-                    </select>
-                    <select id="ofertaCategoriaId" class="input-field">
-                        <option value="">Seleccionar categoría</option>
-                    </select>
-                    <input type="text" id="ofertaTitulo" placeholder="Título de la oferta (ej: Parrillada Familiar)" class="input-field">
-                    <textarea id="ofertaDescripcion" placeholder="Descripción" class="input-field" rows="3"></textarea>
-                    <input type="number" id="ofertaPrecio" placeholder="Precio (opcional)" class="input-field">
-                    <label style="display:block;margin:10px 0 4px;color:#b0b0b0;font-size:0.9rem;">
-                        Imagen tipo flyer de cine (vertical, ideal 500x750px)
-                    </label>
-                    <input type="file" id="ofertaImagenInput" accept="image/*" class="input-field" onchange="previsualizarImagenOferta(event)">
-                    <div id="ofertaImagenPreview" style="display:none;margin:10px 0;">
-                        <img src="" alt="Preview" style="width:120px;border-radius:8px;border:1px solid #2a2a2a;">
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" onclick="crearOferta()" class="btn-primary">Guardar</button>
-                        <button type="button" onclick="hideForm('oferta')" class="btn-secondary">Cancelar</button>
-                    </div>
-                </div>
-                <div id="listaOfertas" class="card-grid"></div>
-            </div>
-
-            <!-- TAB ADMIN -->
-            <div id="tabAdmin" class="tab-content" style="display:none;">
-                <div class="action-bar">
-                    <h3>💰 Liquidación del Administrador</h3>
-                </div>
-                <div class="card" style="max-width:400px;margin:0 auto;">
-                    <h4>Total Ganado</h4>
-                    <p style="font-size:2.5rem;color:#ff6b35;text-align:center;margin:20px 0;" id="totalAdmin">$0</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- ============================================ -->
-        <!-- ===== PANEL USUARIO (REPARTIDOR) ===== -->
-        <!-- ============================================ -->
-        <div id="usuarioPanel" class="section" style="display:none;">
-            <div class="admin-header">
-                <div class="brand">
-                    <img class="appLogo" src="logo.png" alt="Deliberisso">
-                    <h1 id="bienvenidaUsuario">👋 Hola, Repartidor</h1>
-                </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <button type="button" onclick="activarSonidoManual()" class="btn-warning" id="btnActivarSonido">
-                        🔊 Activar Sonido
-                    </button>
-                    <button type="button" onclick="logoutUsuario()" class="btn-danger">Cerrar Sesión</button>
-                </div>
-            </div>
-
-            <div class="stats-bar">
-                <div class="stat-card">
-                    <span id="vehiculoUsuario">🚲 Bici</span>
-                </div>
-                <div class="stat-card">
-                    <span>💰 Liquidación: </span>
-                    <strong id="liquidacionUsuario" style="color: #28a745;">$0</strong>
-                </div>
-                <div class="stat-card">
-                    <span id="estadoUsuario" class="badge-active">✅ Activo</span>
-                </div>
-                <div class="stat-card">
-                    <button type="button" id="btnDisponibilidad" onclick="toggleDisponibilidad()" class="btn-success">
-                        🟢 Disponible
-                    </button>
-                </div>
-                <div class="stat-card">
-                    <span id="gpsUsuario">📍 GPS desactivado</span>
-                </div>
-                <div class="stat-card">
-                    <span id="ubicacionUsuario">Sin datos</span>
-                </div>
-            </div>
-
-            <div class="tabs">
-                <button type="button" class="tab-btn active" onclick="showUserTab('pendientes')">📋 Pendientes</button>
-                <button type="button" class="tab-btn" onclick="showUserTab('misPedidos')">📦 Mis Pedidos</button>
-                <button type="button" class="tab-btn" onclick="showUserTab('historial')">📜 Historial</button>
-            </div>
-
-            <div id="userTabPendientes" class="tab-content">
-                <h3>📋 Pedidos Disponibles</h3>
-                <div id="pedidosPendientes" class="card-grid"></div>
-            </div>
-
-            <div id="userTabMisPedidos" class="tab-content" style="display:none;">
-                <h3>📦 Mis Pedidos Asignados</h3>
-                <div id="misPedidos" class="card-grid"></div>
-            </div>
-
-            <div id="userTabHistorial" class="tab-content" style="display:none;">
-                <h3>📜 Historial de Pedidos Completados</h3>
-                <div id="historialPedidos" class="card-grid"></div>
-            </div>
-        </div>
-        
     </div>
 
-    <!-- Firebase Config -->
+    <!-- ADMIN + REPARTIDOR SECTION -->
+    <div id="adminSection" style="display: none;">
+        <div class="container">
+
+            <!-- ============================================ -->
+            <!-- ===== LOGIN ADMIN ===== -->
+            <!-- ============================================ -->
+            <div id="loginSection" class="section">
+                <div class="login-box">
+                    <div class="brand">
+                        <img class="appLogo" src="logo.png" alt="Deliberisso">
+                        <div>
+                            <h1>Deliberisso</h1>
+                            <h2>Panel de Administración</h2>
+                        </div>
+                    </div>
+                    <input type="password" id="adminPassword" placeholder="Clave de Administrador" class="input-field">
+                    <button type="button" onclick="loginAdmin()" class="btn-primary">Ingresar</button>
+                    <div id="loginError" class="error-message"></div>
+
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
+                        <p style="text-align: center; margin-bottom: 15px;">¿Eres repartidor?</p>
+                        <button type="button" onclick="mostrarLoginUsuario()" class="btn-secondary" style="width: 100%;">
+                            👤 Ingresar como Repartidor
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- ===== LOGIN USUARIO (REPARTIDOR) ===== -->
+            <!-- ============================================ -->
+            <div id="loginUsuarioSection" class="section" style="display:none;">
+                <div class="login-box">
+                    <div class="brand">
+                        <img class="appLogo" src="logo.png" alt="Deliberisso">
+                        <div>
+                            <h1>Deliberisso</h1>
+                            <h2>Panel de Repartidor</h2>
+                        </div>
+                    </div>
+                    <input type="text" id="userLogin" placeholder="Usuario" class="input-field">
+                    <input type="password" id="userPass" placeholder="Contraseña" class="input-field">
+                    <button type="button" onclick="loginUsuario()" class="btn-primary">Ingresar</button>
+                    <div id="userLoginError" class="error-message"></div>
+
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333;">
+                        <p style="text-align: center; margin-bottom: 15px;">¿Eres administrador?</p>
+                        <button type="button" onclick="mostrarLoginAdmin()" class="btn-secondary" style="width: 100%;">
+                            👨‍💼 Ingresar como Administrador
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- ===== PANEL ADMIN ===== -->
+            <!-- ============================================ -->
+            <div id="adminPanel" class="section" style="display:none;">
+                <div class="admin-header">
+                    <div class="brand">
+                        <img class="appLogo" src="logo.png" alt="Deliberisso">
+                        <h1>Deliberisso — Panel de Administración</h1>
+                    </div>
+                    <button type="button" onclick="logout()" class="btn-danger">Cerrar Sesión</button>
+                </div>
+
+                <div class="tabs">
+                    <button type="button" class="tab-btn active" onclick="showTab('usuarios')">👥 Usuarios</button>
+                    <button type="button" class="tab-btn" onclick="showTab('clientes')">🏢 Clientes</button>
+                    <button type="button" class="tab-btn" onclick="showTab('pedidos')">📦 Pedidos</button>
+                    <button type="button" class="tab-btn" onclick="showTab('liquidaciones')">💰 Liquidaciones</button>
+                    <button type="button" class="tab-btn" onclick="showTab('gps')">🛰️ GPS</button>
+                    <button type="button" class="tab-btn" onclick="showTab('categorias')">🎬 Categorías</button>
+                    <button type="button" class="tab-btn" onclick="showTab('ofertas')">🍿 Ofertas</button>
+                    <button type="button" class="tab-btn" onclick="showTab('admin')">💼 Admin</button>
+                </div>
+
+                <!-- TAB USUARIOS -->
+                <div id="tabUsuarios" class="tab-content">
+                    <div class="action-bar">
+                        <h3>Gestión de Usuarios</h3>
+                        <button type="button" onclick="showForm('usuario')" class="btn-success">+ Nuevo Usuario</button>
+                    </div>
+                    <div id="usuarioForm" class="form-container" style="display:none;">
+                        <h4>Crear Nuevo Usuario</h4>
+                        <input type="text" id="nombre" placeholder="Nombre completo" class="input-field">
+                        <input type="text" id="username" placeholder="Nombre de usuario" class="input-field">
+                        <input type="text" id="password" placeholder="Contraseña" class="input-field">
+                        <select id="vehiculo" class="input-field">
+                            <option value="bici">🚲 Bici</option>
+                            <option value="moto">🏍️ Moto</option>
+                            <option value="auto">🚗 Auto</option>
+                        </select>
+                        <div class="form-actions">
+                            <button type="button" onclick="crearUsuario()" class="btn-primary">Guardar</button>
+                            <button type="button" onclick="hideForm('usuario')" class="btn-secondary">Cancelar</button>
+                        </div>
+                    </div>
+                    <div id="listaUsuarios" class="card-grid"></div>
+                </div>
+
+                <!-- TAB CLIENTES -->
+                <div id="tabClientes" class="tab-content" style="display:none;">
+                    <div class="action-bar">
+                        <h3>Gestión de Clientes</h3>
+                        <button type="button" onclick="showForm('cliente')" class="btn-success">+ Nuevo Cliente</button>
+                    </div>
+                    <div id="clienteForm" class="form-container" style="display:none;">
+                        <h4>Crear Nuevo Cliente</h4>
+                        <input type="text" id="clienteNombre" placeholder="Nombre del cliente" class="input-field">
+                        <input type="text" id="clienteDireccion" placeholder="Dirección" class="input-field">
+                        <input type="text" id="clienteTelefono" placeholder="Teléfono" class="input-field">
+                        <input type="email" id="clienteEmail" placeholder="Email" class="input-field">
+                        <input type="text" id="clienteReferencia" placeholder="Referencia / detalle (opcional)" class="input-field">
+                        <div class="form-actions">
+                            <button type="button" onclick="crearCliente()" class="btn-primary">Guardar</button>
+                            <button type="button" onclick="hideForm('cliente')" class="btn-secondary">Cancelar</button>
+                        </div>
+                    </div>
+                    <div id="listaClientes" class="card-grid"></div>
+                </div>
+
+                <!-- TAB PEDIDOS -->
+                <div id="tabPedidos" class="tab-content" style="display:none;">
+                    <div class="action-bar">
+                        <h3>Gestión de Pedidos</h3>
+                        <button type="button" onclick="showForm('pedido')" class="btn-success">+ Nuevo Pedido</button>
+                    </div>
+                    <div id="pedidoForm" class="form-container" style="display:none;">
+                        <h4>Crear Nuevo Pedido</h4>
+                        <input type="text" id="descripcion" placeholder="Descripción del pedido" class="input-field">
+                        <select id="clienteOrigen" class="input-field">
+                            <option value="">Seleccionar cliente (origen)</option>
+                        </select>
+                        <input type="text" id="origenManual" placeholder="O escribir origen manual" class="input-field">
+                        <input type="text" id="destino" placeholder="Destino" class="input-field">
+                        <input type="number" id="costoServicio" placeholder="Costo del servicio" class="input-field">
+                        <input type="number" id="pagoRepartidor" placeholder="Pago al repartidor" class="input-field">
+                        <select id="usuarioAsignado" class="input-field">
+                            <option value="">Sin asignar</option>
+                        </select>
+                        <div class="form-actions">
+                            <button type="button" onclick="crearPedido()" class="btn-primary">Guardar</button>
+                            <button type="button" onclick="hideForm('pedido')" class="btn-secondary">Cancelar</button>
+                        </div>
+                    </div>
+                    <div id="listaPedidos" class="card-grid"></div>
+                </div>
+
+                <!-- TAB LIQUIDACIONES -->
+                <div id="tabLiquidaciones" class="tab-content" style="display:none;">
+                    <h3>📊 Liquidaciones de Repartidores</h3>
+                    <div id="liquidacionesList" class="card-grid"></div>
+                </div>
+
+                <!-- TAB GPS -->
+                <div id="tabGps" class="tab-content" style="display:none;">
+                    <div class="action-bar">
+                        <h3>🛰️ Usuarios activos con GPS</h3>
+                        <button type="button" onclick="cargarVistaGps()" class="btn-primary">Actualizar</button>
+                    </div>
+                    <div id="vistaGps" class="card-grid"></div>
+                </div>
+
+                <!-- TAB CATEGORÍAS (géneros estilo Netflix para la landing) -->
+                <div id="tabCategorias" class="tab-content" style="display:none;">
+                    <div class="action-bar">
+                        <h3>Categorías de la Landing</h3>
+                        <button type="button" onclick="showForm('categoria')" class="btn-success">+ Nueva Categoría</button>
+                    </div>
+                    <div id="categoriaForm" class="form-container" style="display:none;">
+                        <h4>Crear Nueva Categoría</h4>
+                        <input type="text" id="categoriaNombre" placeholder="Nombre (ej: Parrilla, Pizza, Postres)" class="input-field">
+                        <input type="number" id="categoriaOrden" placeholder="Orden (menor = aparece primero)" class="input-field" value="0">
+                        <div class="form-actions">
+                            <button type="button" onclick="crearCategoria()" class="btn-primary">Guardar</button>
+                            <button type="button" onclick="hideForm('categoria')" class="btn-secondary">Cancelar</button>
+                        </div>
+                    </div>
+                    <div id="listaCategorias" class="card-grid"></div>
+                </div>
+
+                <!-- TAB OFERTAS (los "pósters" de la landing) -->
+                <div id="tabOfertas" class="tab-content" style="display:none;">
+                    <div class="action-bar">
+                        <h3>Ofertas Gastronómicas</h3>
+                        <button type="button" onclick="showForm('oferta')" class="btn-success">+ Nueva Oferta</button>
+                    </div>
+                    <div id="ofertaForm" class="form-container" style="display:none;">
+                        <h4>Crear Nueva Oferta</h4>
+                        <select id="ofertaClienteId" class="input-field">
+                            <option value="">Seleccionar local (cliente)</option>
+                        </select>
+                        <select id="ofertaCategoriaId" class="input-field">
+                            <option value="">Seleccionar categoría</option>
+                        </select>
+                        <input type="text" id="ofertaTitulo" placeholder="Título de la oferta (ej: Parrillada Familiar)" class="input-field">
+                        <textarea id="ofertaDescripcion" placeholder="Descripción" class="input-field" rows="3"></textarea>
+                        <input type="number" id="ofertaPrecio" placeholder="Precio (opcional)" class="input-field">
+                        <label style="display:block;margin:10px 0 4px;color:#b0b0b0;font-size:0.9rem;">
+                            Imagen tipo flyer de cine (vertical, ideal 500x750px)
+                        </label>
+                        <input type="file" id="ofertaImagenInput" accept="image/*" class="input-field" onchange="previsualizarImagenOferta(event)">
+                        <div id="ofertaImagenPreview" style="display:none;margin:10px 0;">
+                            <img src="" alt="Preview" style="width:120px;border-radius:8px;border:1px solid #2a2a2a;">
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" onclick="crearOferta()" class="btn-primary">Guardar</button>
+                            <button type="button" onclick="hideForm('oferta')" class="btn-secondary">Cancelar</button>
+                        </div>
+                    </div>
+                    <div id="listaOfertas" class="card-grid"></div>
+                </div>
+
+                <!-- TAB ADMIN -->
+                <div id="tabAdmin" class="tab-content" style="display:none;">
+                    <div class="action-bar">
+                        <h3>💰 Liquidación del Administrador</h3>
+                    </div>
+                    <div class="card" style="max-width:400px;margin:0 auto;">
+                        <h4>Total Ganado</h4>
+                        <p style="font-size:2.5rem;color:#ff6b35;text-align:center;margin:20px 0;" id="totalAdmin">$0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- ===== PANEL USUARIO (REPARTIDOR) ===== -->
+            <!-- ============================================ -->
+            <div id="usuarioPanel" class="section" style="display:none;">
+                <div class="admin-header">
+                    <div class="brand">
+                        <img class="appLogo" src="logo.png" alt="Deliberisso">
+                        <h1 id="bienvenidaUsuario">👋 Hola, Repartidor</h1>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="button" onclick="activarSonidoManual()" class="btn-warning" id="btnActivarSonido">
+                            🔊 Activar Sonido
+                        </button>
+                        <button type="button" onclick="logoutUsuario()" class="btn-danger">Cerrar Sesión</button>
+                    </div>
+                </div>
+
+                <div class="stats-bar">
+                    <div class="stat-card">
+                        <span id="vehiculoUsuario">🚲 Bici</span>
+                    </div>
+                    <div class="stat-card">
+                        <span>💰 Liquidación: </span>
+                        <strong id="liquidacionUsuario" style="color: #28a745;">$0</strong>
+                    </div>
+                    <div class="stat-card">
+                        <span id="estadoUsuario" class="badge-active">✅ Activo</span>
+                    </div>
+                    <div class="stat-card">
+                        <button type="button" id="btnDisponibilidad" onclick="toggleDisponibilidad()" class="btn-success">
+                            🟢 Disponible
+                        </button>
+                    </div>
+                    <div class="stat-card">
+                        <span id="gpsUsuario">📍 GPS desactivado</span>
+                    </div>
+                    <div class="stat-card">
+                        <span id="ubicacionUsuario">Sin datos</span>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <button type="button" class="tab-btn active" onclick="showUserTab('pendientes')">📋 Pendientes</button>
+                    <button type="button" class="tab-btn" onclick="showUserTab('misPedidos')">📦 Mis Pedidos</button>
+                    <button type="button" class="tab-btn" onclick="showUserTab('historial')">📜 Historial</button>
+                </div>
+
+                <div id="userTabPendientes" class="tab-content">
+                    <h3>📋 Pedidos Disponibles</h3>
+                    <div id="pedidosPendientes" class="card-grid"></div>
+                </div>
+
+                <div id="userTabMisPedidos" class="tab-content" style="display:none;">
+                    <h3>📦 Mis Pedidos Asignados</h3>
+                    <div id="misPedidos" class="card-grid"></div>
+                </div>
+
+                <div id="userTabHistorial" class="tab-content" style="display:none;">
+                    <h3>📜 Historial de Pedidos Completados</h3>
+                    <div id="historialPedidos" class="card-grid"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
     <script src="firebase-config.js"></script>
-    <!-- App Logic -->
     <script src="app.js"></script>
-    
-    <!-- Funciones adicionales para cambiar entre login admin y usuario -->
     <script>
+        // Landing functions
+        let categoriasCache = [];
+        let ofertasCache = [];
+        let clientesCache = [];
+
+        function iniciarLanding() {
+            if (typeof window.firebaseFunctions === 'undefined') {
+                setTimeout(iniciarLanding, 300);
+                return;
+            }
+            cargarLanding();
+        }
+
+        async function cargarLanding() {
+            const f = window.firebaseFunctions;
+            try {
+                [categoriasCache, ofertasCache, clientesCache] = await Promise.all([
+                    f.getCategorias(),
+                    f.getOfertas(),
+                    f.getClientes()
+                ]);
+                categoriasCache.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+                renderLanding();
+            } catch (error) {
+                console.error('Error cargando la landing:', error);
+                document.getElementById('categoriasContainer').innerHTML =
+                    '<div class="sin-ofertas">No se pudieron cargar las ofertas. Intentá recargar la página.</div>';
+            }
+        }
+
+        function nombreLocal(clienteId) {
+            const c = clientesCache.find(c => c.id === clienteId);
+            return c ? c.nombre : '';
+        }
+
+        function renderLanding() {
+            const cont = document.getElementById('categoriasContainer');
+            const activas = ofertasCache.filter(o => o.activo);
+            const categoriasConOfertas = categoriasCache.filter(cat => activas.some(o => o.categoriaId === cat.id));
+
+            if (categoriasConOfertas.length === 0) {
+                cont.innerHTML = '<div class="sin-ofertas">Todavía no hay ofertas cargadas. ¡Volvé pronto!</div>';
+                return;
+            }
+
+            cont.innerHTML = categoriasConOfertas.map(cat => {
+                const ofertasCat = activas.filter(o => o.categoriaId === cat.id);
+                return `
+                    <div class="categoria-row">
+                        <h2 class="categoria-titulo">${cat.nombre}</h2>
+                        <div class="poster-scroll">
+                            ${ofertasCat.map(o => `
+                                <div class="poster-card" onclick="abrirDetalleOferta(${o.id})">
+                                    ${o.imagenUrl
+                                        ? `<img class="poster-img" src="${o.imagenUrl}" alt="${o.titulo}">`
+                                        : `<div class="poster-img poster-placeholder">🍽️</div>`}
+                                    <div class="poster-titulo">${o.titulo}</div>
+                                    <div class="poster-local">${nombreLocal(o.clienteId)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function abrirDetalleOferta(id) {
+            const o = ofertasCache.find(o => o.id === id);
+            if (!o) return;
+            const cliente = clientesCache.find(c => c.id === o.clienteId);
+            const telefono = cliente && cliente.telefono ? cliente.telefono.replace(/\D/g, '') : '';
+            const mensaje = encodeURIComponent(`Hola! Vi "${o.titulo}"${cliente ? ' de ' + cliente.nombre : ''} en Deliberisso y quiero pedirlo.`);
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.onclick = e => { if (e.target === modal) modal.remove(); };
+            modal.innerHTML = `
+                <div class="modal-card">
+                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
+                    ${o.imagenUrl ? `<img class="modal-img" src="${o.imagenUrl}" alt="${o.titulo}">` : ''}
+                    <div class="modal-body">
+                        <h2 class="modal-titulo">${o.titulo}</h2>
+                        <p class="modal-local">🏢 ${cliente ? cliente.nombre : 'Local'}</p>
+                        ${o.descripcion ? `<p class="modal-desc">${o.descripcion}</p>` : ''}
+                        ${o.precio != null ? `<p class="modal-precio">$${o.precio}</p>` : ''}
+                        ${telefono && telefono.length >= 8
+                            ? `<a class="btn-whatsapp" href="https://wa.me/${telefono}?text=${mensaje}" target="_blank" rel="noopener noreferrer">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M20.52 3.48C18.32 1.28 15.3 0 12.01 0 5.39 0 .01 5.39 .01 12c0 2.12.56 4.19 1.62 6L0 24l6.26-1.64c1.75.96 3.73 1.47 5.75 1.47h.01c6.62 0 12.01-5.39 12.01-12 0-3.29-1.28-6.31-3.47-8.52zm-8.51 18.14c-2.02 0-3.99-.54-5.69-1.55l-.41-.24-3.71.98.99-3.62-.27-.38A9.87 9.87 0 0 1 2.01 12c0-5.46 4.44-9.9 9.9-9.9 2.65 0 5.14 1.03 7.01 2.9A9.858 9.858 0 0 1 22.01 12c0 5.46-4.44 9.9-9.9 9.9zm5.4-7.38c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.95 1.18-.17.2-.34.22-.63.08-.3-.15-1.24-.46-2.36-1.45-.87-.76-1.46-1.7-1.63-2-.17-.3-.02-.46.13-.61.14-.14.3-.36.45-.54.15-.18.2-.3.3-.5.1-.2.05-.37-.03-.52-.08-.15-.68-1.64-.94-2.26-.25-.58-.51-.5-.68-.51h-.58c-.2 0-.52.07-.8.37-.28.3-1.07 1.05-1.07 2.56 0 1.51 1.09 2.97 1.24 3.17.15.2 2.14 3.25 5.19 4.55.73.32 1.3.51 1.74.65.73.23 1.4.2 1.93.12.59-.1 1.78-.73 2.03-1.44.25-.71.25-1.32.18-1.45-.07-.12-.26-.2-.55-.35z" fill="#fff"/>
+                                </svg>
+                                Pedir por WhatsApp
+                              </a>`
+                            : `<p class="sin-whatsapp">Este local todavía no tiene WhatsApp cargado.</p>`}
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // Router: detectar ruta y mostrar panel correcto
+        function setupRouter() {
+            const ruta = window.location.pathname;
+            const landingSection = document.getElementById('landingSection');
+            const adminSection = document.getElementById('adminSection');
+            const loginSection = document.getElementById('loginSection');
+            const loginUsuarioSection = document.getElementById('loginUsuarioSection');
+
+            if (ruta === '/' || ruta === '') {
+                // Landing pública
+                landingSection.style.display = 'block';
+                adminSection.style.display = 'none';
+                iniciarLanding();
+            } else if (ruta === '/admin') {
+                // Admin panel
+                adminSection.style.display = 'block';
+                landingSection.style.display = 'none';
+                if (loginUsuarioSection) loginUsuarioSection.style.display = 'none';
+                if (loginSection) {
+                    const sesion = obtenerSesionAdmin();
+                    if (sesion) {
+                        loginSection.style.display = 'none';
+                        const panel = document.getElementById('adminPanel');
+                        if (panel) panel.style.display = 'block';
+                        cargarDatosAdmin();
+                        iniciarPollingAdmin();
+                    } else {
+                        loginSection.style.display = 'block';
+                    }
+                }
+            } else if (ruta === '/repartidores') {
+                // Repartidor panel
+                adminSection.style.display = 'block';
+                landingSection.style.display = 'none';
+                if (loginSection) loginSection.style.display = 'none';
+                if (loginUsuarioSection) {
+                    const sesion = obtenerSesionUsuario();
+                    if (sesion) {
+                        loginUsuarioSection.style.display = 'none';
+                        const panel = document.getElementById('usuarioPanel');
+                        if (panel) panel.style.display = 'block';
+                        cargarPanelUsuario(sesion);
+                        iniciarPollingUsuario(sesion.id);
+                    } else {
+                        loginUsuarioSection.style.display = 'block';
+                    }
+                }
+            }
+        }
+
+        // Funciones para cambiar entre login admin y usuario
         function mostrarLoginUsuario() {
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('loginUsuarioSection').style.display = 'block';
         }
-        
+
         function mostrarLoginAdmin() {
             document.getElementById('loginUsuarioSection').style.display = 'none';
             document.getElementById('loginSection').style.display = 'block';
         }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            setupRouter();
+        });
     </script>
 </body>
 </html>

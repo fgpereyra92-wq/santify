@@ -203,9 +203,18 @@ async function registrarRepartidor(email, password, nombre, vehiculo = 'moto') {
     }
 }
 
-async function loginRepartidor(email, password) {
+// Acepta email (cuenta de Firebase Auth) o usuario clásico guardado en la base.
+// Los repartidores existentes usan usuario/contraseña, así que ese camino es el que
+// mantiene el acceso mientras no se migren todas las cuentas a Firebase Auth.
+async function loginRepartidor(identificador, password) {
+    const id = (identificador || '').trim();
+
+    if (!id.includes('@')) {
+        return loginRepartidorClasico(id, password);
+    }
+
     try {
-        const userCred = await auth.signInWithEmailAndPassword(email, password);
+        const userCred = await auth.signInWithEmailAndPassword(id, password);
         const uid = userCred.user.uid;
 
         const snap = await database.ref(`usuarios/${uid}`).once('value');
@@ -216,10 +225,28 @@ async function loginRepartidor(email, password) {
             return { success: false, error: 'Usuario no encontrado en BD' };
         }
 
-        return { success: true, uid, user: usuario, authUser: userCred.user };
+        return { success: true, uid, user: { id: uid, ...usuario }, authUser: userCred.user };
     } catch (error) {
         console.error('Error en login repartidor:', error);
-        return { success: false, error: error.message };
+        return { success: false, error: 'Email o contraseña incorrectos' };
+    }
+}
+
+async function loginRepartidorClasico(username, password) {
+    try {
+        const snapshot = await database.ref('usuarios').once('value');
+        const data = snapshot.val();
+        if (!data) return { success: false, error: 'Usuario o contraseña incorrectos' };
+
+        const key = Object.keys(data).find(k =>
+            data[k].username === username && data[k].password === password
+        );
+        if (!key) return { success: false, error: 'Usuario o contraseña incorrectos' };
+
+        return { success: true, user: { id: parseInt(key), ...data[key] } };
+    } catch (error) {
+        console.error('Error en login repartidor (clásico):', error);
+        return { success: false, error: 'Error de conexión' };
     }
 }
 

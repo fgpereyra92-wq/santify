@@ -11,6 +11,24 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+    <script>
+        // Router independiente de la carpeta base: funciona igual en la raíz de un
+        // dominio propio y dentro de un subdirectorio como /santify/ en GitHub Pages.
+        // Solo estas rutas abren el panel; cualquier otra cosa es la landing pública.
+        (function () {
+            const RUTAS_PANEL = {
+                admin: 'admin',
+                repartidores: 'repartidores',
+                usuarios: 'repartidores'
+            };
+            const v = new URLSearchParams(window.location.search).get('v');
+            const segmento = v || (window.location.pathname.split('/').filter(Boolean).pop() || '')
+                .replace(/\.html$/, '');
+            const ruta = RUTAS_PANEL[segmento.toLowerCase()] || null;
+            window.rutaVista = ruta;                       // null = landing
+            window.currentRoute = ruta ? '/' + ruta : '/'; // lo lee app.js
+        })();
+    </script>
     <style>
         /* Landing styles */
         .landing-container {
@@ -251,7 +269,7 @@
                             <h2>Panel de Repartidor</h2>
                         </div>
                     </div>
-                    <input type="text" id="userLogin" placeholder="Usuario" class="input-field">
+                    <input type="text" id="userLogin" placeholder="Usuario o email" class="input-field" autocapitalize="none" autocorrect="off">
                     <input type="password" id="userPass" placeholder="Contraseña" class="input-field">
                     <button type="button" onclick="loginUsuario()" class="btn-primary">Ingresar</button>
                     <div id="userLoginError" class="error-message"></div>
@@ -601,16 +619,28 @@
             document.body.appendChild(modal);
         }
 
-        // Router: la landing va en "/", el resto de rutas usan el panel.
-        // La sesión y el login visible los resuelve iniciarSistema() en app.js.
+        // La ruta ya se calculó en el <head>. La sesión y el panel visible los
+        // resuelve iniciarSistema() en app.js.
         function setupRouter() {
-            const ruta = window.location.pathname;
-            const esLanding = (ruta === '/' || ruta === '' || ruta === '/index.html');
+            const ruta = window.rutaVista;
 
-            document.getElementById('landingSection').style.display = esLanding ? 'block' : 'none';
-            document.getElementById('adminSection').style.display = esLanding ? 'none' : 'block';
+            document.getElementById('landingSection').style.display = ruta ? 'none' : 'block';
+            document.getElementById('adminSection').style.display = ruta ? 'block' : 'none';
 
-            if (esLanding) iniciarLanding();
+            if (!ruta) {
+                iniciarLanding();
+                return;
+            }
+
+            // Mostrar únicamente el login que corresponde a la ruta. Si iniciarSistema()
+            // ya restauró la sesión y abrió el panel, no volvemos a tapar con el login.
+            const esAdmin = ruta === 'admin';
+            const login = document.getElementById(esAdmin ? 'loginSection' : 'loginUsuarioSection');
+            const otroLogin = document.getElementById(esAdmin ? 'loginUsuarioSection' : 'loginSection');
+            const panel = document.getElementById(esAdmin ? 'adminPanel' : 'usuarioPanel');
+
+            otroLogin.style.display = 'none';
+            login.style.display = panel.style.display === 'block' ? 'none' : 'block';
         }
 
         // Funciones para cambiar entre login admin y usuario

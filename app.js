@@ -2004,7 +2004,12 @@ function iniciarSistema() {
         if (usuarioLogin) usuarioLogin.style.display = 'none';
     }
 
-    if (obtenerSesionAdmin()) {
+    // Restaurar solo la sesión que corresponde a la ruta: si no, una sesión de admin
+    // abierta en la misma pestaña se filtra en /repartidores (y al revés).
+    const permiteAdmin = ruta !== '/repartidores';
+    const permiteUsuario = ruta !== '/admin';
+
+    if (permiteAdmin && obtenerSesionAdmin()) {
         const loginSection = document.getElementById('loginSection');
         const adminPanel = document.getElementById('adminPanel');
         if (loginSection) loginSection.style.display = 'none';
@@ -2012,7 +2017,7 @@ function iniciarSistema() {
         cargarDatosAdmin();
         iniciarPollingAdmin();
     }
-    const usuario = obtenerSesionUsuario();
+    const usuario = permiteUsuario ? obtenerSesionUsuario() : null;
     if (usuario) {
         usuarioActual = usuario;
         window.usuarioActual = usuario;

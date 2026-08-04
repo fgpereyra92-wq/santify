@@ -507,10 +507,6 @@
     <script src="app.js"></script>
     <script>
         // Landing functions
-        let categoriasCache = [];
-        let ofertasCache = [];
-        let clientesCache = [];
-
         function iniciarLanding() {
             if (typeof window.firebaseFunctions === 'undefined') {
                 setTimeout(iniciarLanding, 300);
@@ -605,54 +601,16 @@
             document.body.appendChild(modal);
         }
 
-        // Router: detectar ruta y mostrar panel correcto
+        // Router: la landing va en "/", el resto de rutas usan el panel.
+        // La sesión y el login visible los resuelve iniciarSistema() en app.js.
         function setupRouter() {
             const ruta = window.location.pathname;
-            const landingSection = document.getElementById('landingSection');
-            const adminSection = document.getElementById('adminSection');
-            const loginSection = document.getElementById('loginSection');
-            const loginUsuarioSection = document.getElementById('loginUsuarioSection');
+            const esLanding = (ruta === '/' || ruta === '' || ruta === '/index.html');
 
-            if (ruta === '/' || ruta === '') {
-                // Landing pública
-                landingSection.style.display = 'block';
-                adminSection.style.display = 'none';
-                iniciarLanding();
-            } else if (ruta === '/admin') {
-                // Admin panel
-                adminSection.style.display = 'block';
-                landingSection.style.display = 'none';
-                if (loginUsuarioSection) loginUsuarioSection.style.display = 'none';
-                if (loginSection) {
-                    const sesion = obtenerSesionAdmin();
-                    if (sesion) {
-                        loginSection.style.display = 'none';
-                        const panel = document.getElementById('adminPanel');
-                        if (panel) panel.style.display = 'block';
-                        cargarDatosAdmin();
-                        iniciarPollingAdmin();
-                    } else {
-                        loginSection.style.display = 'block';
-                    }
-                }
-            } else if (ruta === '/repartidores') {
-                // Repartidor panel
-                adminSection.style.display = 'block';
-                landingSection.style.display = 'none';
-                if (loginSection) loginSection.style.display = 'none';
-                if (loginUsuarioSection) {
-                    const sesion = obtenerSesionUsuario();
-                    if (sesion) {
-                        loginUsuarioSection.style.display = 'none';
-                        const panel = document.getElementById('usuarioPanel');
-                        if (panel) panel.style.display = 'block';
-                        cargarPanelUsuario(sesion);
-                        iniciarPollingUsuario(sesion.id);
-                    } else {
-                        loginUsuarioSection.style.display = 'block';
-                    }
-                }
-            }
+            document.getElementById('landingSection').style.display = esLanding ? 'block' : 'none';
+            document.getElementById('adminSection').style.display = esLanding ? 'none' : 'block';
+
+            if (esLanding) iniciarLanding();
         }
 
         // Funciones para cambiar entre login admin y usuario

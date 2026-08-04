@@ -1,4 +1,0 @@
-# Rutas limpias para Deliberisso (Cloudflare Pages)
-/ /landing.html 200
-/landing.html /landing.html 200
-/* /index.html 200

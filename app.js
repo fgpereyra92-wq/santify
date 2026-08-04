@@ -2,7 +2,6 @@
 // ===== app.js — VERSIÓN ESTABLE Y PROFESIONAL =====
 // ============================================================
 
-const ADMIN_PASSWORD = 'LedZepp1';
 let usuarioActual = null;
 let usuariosCache = [];
 let pedidosCache = [];
@@ -79,34 +78,60 @@ function limpiarSesion() { sessionStorage.removeItem('admin'); sessionStorage.re
 
 async function loginAdmin() {
     const pass = document.getElementById('adminPassword').value;
-    if (pass === ADMIN_PASSWORD) {
-        guardarSesionAdmin(true);
-        const loginSection = document.getElementById('loginSection');
-        const adminPanel = document.getElementById('adminPanel');
-        if (loginSection) loginSection.style.display = 'none';
-        if (adminPanel) adminPanel.style.display = 'block';
-        await cargarDatosAdmin();
-        iniciarPollingAdmin();
-        document.getElementById('adminPassword').value = '';
-        const errorEl = document.getElementById('loginError');
-        if (errorEl) errorEl.textContent = '';
-    } else {
-        const errorEl = document.getElementById('loginError');
-        if (errorEl) errorEl.textContent = '❌ Clave incorrecta';
+    const errorEl = document.getElementById('loginError');
+
+    try {
+        const f = fb();
+        if (!f) {
+            if (errorEl) errorEl.textContent = '❌ Error de conexión';
+            return;
+        }
+
+        const result = await f.loginAdmin(pass);
+        if (result.success) {
+            guardarSesionAdmin(true);
+            const loginSection = document.getElementById('loginSection');
+            const adminPanel = document.getElementById('adminPanel');
+            if (loginSection) loginSection.style.display = 'none';
+            if (adminPanel) adminPanel.style.display = 'block';
+            await cargarDatosAdmin();
+            iniciarPollingAdmin();
+            document.getElementById('adminPassword').value = '';
+            if (errorEl) errorEl.textContent = '';
+        } else {
+            if (errorEl) errorEl.textContent = '❌ Clave incorrecta';
+        }
+    } catch (error) {
+        console.error('Error en login admin:', error);
+        if (errorEl) errorEl.textContent = '❌ Error de conexión';
     }
 }
 
-function logout() {
+async function logout() {
     if (!confirm('¿Cerrar sesión?')) return;
+
+    try {
+        const f = fb();
+        if (f) {
+            await f.logoutUsuario();
+            if (f.dejarDeEscuchar) f.dejarDeEscuchar();
+        }
+    } catch (error) {
+        console.error('Error en logout:', error);
+    }
+
     limpiarSesion();
+    usuarioActual = null;
     detenerSeguimientoUbicacion();
-    const f = fb();
-    if (f) f.dejarDeEscuchar();
     detenerTodosPolling();
+
     const loginSection = document.getElementById('loginSection');
     const adminPanel = document.getElementById('adminPanel');
+    const usuarioPanel = document.getElementById('usuarioPanel');
+
     if (loginSection) loginSection.style.display = 'block';
     if (adminPanel) adminPanel.style.display = 'none';
+    if (usuarioPanel) usuarioPanel.style.display = 'none';
 }
 
 // ============================================================
@@ -114,35 +139,36 @@ function logout() {
 // ============================================================
 
 async function loginUsuario() {
-    const username = document.getElementById('userLogin').value;
+    const email = document.getElementById('userLogin').value;
     const password = document.getElementById('userPass').value;
     const errorEl = document.getElementById('userLoginError');
-    
+
     try {
         const f = fb();
         if (!f) {
             if (errorEl) errorEl.textContent = '❌ Error de conexión';
             return;
         }
-        
-        const usuarios = await f.getUsuarios();
-        const usuario = usuarios.find(u => u.username === username && u.password === password);
-        
-        if (usuario) {
+
+        const result = await f.loginRepartidor(email, password);
+        if (result.success) {
+            const usuario = result.user;
             usuarioActual = usuario;
             window.usuarioActual = usuario;
             guardarSesionUsuario(usuario);
-            
+
             const loginSection = document.getElementById('loginUsuarioSection');
             const panel = document.getElementById('usuarioPanel');
             if (loginSection) loginSection.style.display = 'none';
             if (panel) panel.style.display = 'block';
-            
+
             if (errorEl) errorEl.textContent = '';
+            document.getElementById('userLogin').value = '';
+            document.getElementById('userPass').value = '';
             await cargarPanelUsuario(usuario);
             iniciarPollingUsuario(usuario.id);
         } else {
-            if (errorEl) errorEl.textContent = '❌ Usuario o contraseña incorrectos';
+            if (errorEl) errorEl.textContent = '❌ ' + (result.error || 'Email o contraseña incorrectos');
         }
     } catch (error) {
         console.error('Error en login:', error);

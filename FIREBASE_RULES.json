@@ -1,0 +1,58 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "categorias": {
+      ".read": true
+    },
+
+    "ofertas": {
+      ".read": true
+    },
+
+    "clientes": {
+      ".read": true,
+      ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+    },
+
+    "usuarios": {
+      ".read": false,
+      ".write": false,
+      "$uid": {
+        ".read": "auth.uid === $uid || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
+        ".write": "auth.uid === $uid || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
+        "saldo": {
+          ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+        }
+      }
+    },
+
+    "pedidos": {
+      ".read": false,
+      ".write": false,
+      "$pedidoId": {
+        ".read": "root.child('pedidos').child($pedidoId).child('usuarioAsignado').val() === auth.uid || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
+        ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+      }
+    },
+
+    "liquidaciones": {
+      ".read": false,
+      ".write": false,
+      "$userId": {
+        ".read": "auth.uid === $userId || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
+        ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+      }
+    },
+
+    "historial": {
+      ".read": false,
+      ".write": false,
+      "$historialId": {
+        ".read": "root.child('historial').child($historialId).child('usuarioId').val() === auth.uid || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
+        ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+      }
+    }
+  }
+}

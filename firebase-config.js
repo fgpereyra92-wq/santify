@@ -16,8 +16,10 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const storage = firebase.storage();
+const auth = firebase.auth();
 
 window.firebaseStorage = storage;
+window.firebaseAuth = auth;
 
 // Mantener conexión activa
 database.goOnline();
@@ -169,6 +171,81 @@ function activarSonidoManual() {
     } else {
         alert('⚠️ No se pudo activar el sonido. Intenta nuevamente.');
     }
+}
+
+// ============================================================
+// 🔐 AUTENTICACIÓN CON FIREBASE AUTH
+// ============================================================
+
+const ADMIN_PASSWORD = 'LedZepp1';
+
+async function registrarRepartidor(email, password, nombre, vehiculo = 'moto') {
+    try {
+        const userCred = await auth.createUserWithEmailAndPassword(email, password);
+        const uid = userCred.user.uid;
+
+        await database.ref(`usuarios/${uid}`).set({
+            id: uid,
+            nombre,
+            email,
+            username: email,
+            vehiculo,
+            saldo: 0,
+            estado: 'disponible',
+            activo: true,
+            createdAt: new Date().toISOString()
+        });
+
+        return { success: true, uid, user: userCred.user };
+    } catch (error) {
+        console.error('Error registrando repartidor:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+async function loginRepartidor(email, password) {
+    try {
+        const userCred = await auth.signInWithEmailAndPassword(email, password);
+        const uid = userCred.user.uid;
+
+        const snap = await database.ref(`usuarios/${uid}`).once('value');
+        const usuario = snap.val();
+
+        if (!usuario) {
+            await auth.signOut();
+            return { success: false, error: 'Usuario no encontrado en BD' };
+        }
+
+        return { success: true, uid, user: usuario, authUser: userCred.user };
+    } catch (error) {
+        console.error('Error en login repartidor:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+async function loginAdmin(clave) {
+    if (clave === ADMIN_PASSWORD) {
+        return { success: true, role: 'admin' };
+    }
+    return { success: false, error: 'Clave incorrecta' };
+}
+
+async function logoutUsuario() {
+    try {
+        await auth.signOut();
+        return { success: true };
+    } catch (error) {
+        console.error('Error en logout:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+function getCurrentUser() {
+    return auth.currentUser;
+}
+
+function onAuthStateChanged(callback) {
+    return auth.onAuthStateChanged(callback);
 }
 
 // ============================================================
@@ -464,7 +541,13 @@ window.firebaseFunctions = {
     database,
     activarSonidoManual,
     reproducirSonido,
-    prepararAudio
+    prepararAudio,
+    registrarRepartidor,
+    loginRepartidor,
+    loginAdmin,
+    logoutUsuario,
+    getCurrentUser,
+    onAuthStateChanged
 };
 
 window.getFirebase = function() {

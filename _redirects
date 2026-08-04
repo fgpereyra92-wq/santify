@@ -1,0 +1,11 @@
+# Rutas limpias para Deliberisso (Cloudflare Pages)
+# Las rutas se evalúan de arriba a abajo
+
+# Panel de administración
+/admin /index.html 200
+
+# Panel de repartidores
+/repartidores /index.html 200
+
+# Landing pública (raíz)
+/ /landing.html 200

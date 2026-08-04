@@ -1,9 +1,3 @@
 # Rutas limpias para Deliberisso (Cloudflare Pages)
-# Las rutas se evalúan de arriba a abajo
-
-# Landing pública (específicamente)
-/landing /landing.html 200
-/landing.html /landing.html 200
-
-# Cualquier otra ruta sirve index.html (el router JS lo maneja)
+# Todas las rutas sirven index.html (el router JS en app.js lo maneja)
 /* /index.html 200

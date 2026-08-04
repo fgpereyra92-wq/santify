@@ -12,13 +12,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
     <script>
-        // Detectar ruta actual y redirigir si es necesario
-        const pathname = window.location.pathname;
-        if (pathname === '/' || pathname === '') {
-            window.location.href = '/landing.html';
-        }
         // Marcar el contexto de ruta para que app.js lo sepa
-        window.currentRoute = pathname;
+        window.currentRoute = window.location.pathname;
     </script>
 </head>
 <body>

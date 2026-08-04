@@ -1994,8 +1994,34 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function iniciarSistema() {
-    // Detectar ruta actual para ocultar login innecesario
+    // Detectar ruta actual para mostrar el panel correcto
     const ruta = window.currentRoute || window.location.pathname;
+
+    if (ruta === '/' || ruta === '') {
+        // Raíz: cargar landing en lugar de login
+        const loginSection = document.getElementById('loginSection');
+        const usuarioLogin = document.getElementById('loginUsuarioSection');
+        const adminPanel = document.getElementById('adminPanel');
+        const usuarioPanel = document.getElementById('usuarioPanel');
+
+        if (loginSection) loginSection.style.display = 'none';
+        if (usuarioLogin) usuarioLogin.style.display = 'none';
+        if (adminPanel) adminPanel.style.display = 'none';
+        if (usuarioPanel) usuarioPanel.style.display = 'none';
+
+        // Cargar y mostrar landing
+        const landingContainer = document.createElement('div');
+        landingContainer.id = 'landingContainer';
+        fetch('landing.html')
+            .then(r => r.text())
+            .then(html => {
+                landingContainer.innerHTML = html;
+                document.body.appendChild(landingContainer);
+            })
+            .catch(e => console.error('Error cargando landing:', e));
+        return;
+    }
+
     if (ruta === '/repartidores') {
         const adminLogin = document.getElementById('loginSection');
         if (adminLogin) adminLogin.style.display = 'none';

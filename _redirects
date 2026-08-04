@@ -1,3 +1,6 @@
-/admin /index.html 200
-/repartidores /index.html 200
-/ /landing.html 200
+# Landing pública (específicamente)
+/landing /landing.html 200
+/landing.html /landing.html 200
+
+# Cualquier otra ruta sirve index.html (el router JS lo maneja)
+/* /index.html 200

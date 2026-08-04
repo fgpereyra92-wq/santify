@@ -1994,6 +1994,16 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function iniciarSistema() {
+    // Detectar ruta actual para ocultar login innecesario
+    const ruta = window.currentRoute || window.location.pathname;
+    if (ruta === '/repartidores') {
+        const adminLogin = document.getElementById('loginSection');
+        if (adminLogin) adminLogin.style.display = 'none';
+    } else if (ruta === '/admin') {
+        const usuarioLogin = document.getElementById('loginUsuarioSection');
+        if (usuarioLogin) usuarioLogin.style.display = 'none';
+    }
+
     if (obtenerSesionAdmin()) {
         const loginSection = document.getElementById('loginSection');
         const adminPanel = document.getElementById('adminPanel');

@@ -708,8 +708,11 @@
         </div>
     </div>
 
-    <script src="firebase-config.js"></script>
-    <script src="app.js"></script>
+    <!-- El ?v= fuerza al navegador a bajar el JS nuevo cuando cambia el HTML.
+         Sin esto queda sirviendo scripts viejos de caché y la página falla.
+         Subir el número en cada cambio de firebase-config.js o app.js. -->
+    <script src="firebase-config.js?v=2"></script>
+    <script src="app.js?v=2"></script>
     <script>
         // Landing functions
         function iniciarLanding() {
@@ -725,11 +728,18 @@
         async function cargarLanding() {
             const f = window.firebaseFunctions;
             try {
+                // El teléfono de soporte se pide aparte y tolera fallar: si el navegador
+                // tiene cacheada una versión vieja de firebase-config.js sin getConfig,
+                // el catálogo tiene que cargar igual.
+                const pedirConfig = typeof f.getConfig === 'function'
+                    ? f.getConfig().catch(() => ({}))
+                    : Promise.resolve({});
+
                 [categoriasCache, ofertasCache, clientesCache, configCache] = await Promise.all([
                     f.getCategorias(),
                     f.getOfertas(),
                     f.getClientes(),
-                    f.getConfig()
+                    pedirConfig
                 ]);
                 categoriasCache.sort((a, b) => (a.orden || 0) - (b.orden || 0));
                 poblarFiltroCategorias();

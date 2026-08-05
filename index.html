@@ -209,6 +209,156 @@
             text-align: center;
             font-size: 0.9rem;
         }
+
+        /* Barra de filtros */
+        .landing-filtros {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 28px;
+            align-items: center;
+        }
+        .buscador-wrap { position: relative; flex: 1 1 260px; }
+        .buscador-wrap::before {
+            content: '🔎';
+            position: absolute;
+            left: 14px; top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.9rem;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        .landing-input, .landing-select {
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            color: #e8e8e8;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        .landing-input { width: 100%; padding-left: 40px; }
+        .landing-select { flex: 0 1 200px; cursor: pointer; }
+        .landing-input:focus, .landing-select:focus { border-color: #ff6b35; }
+        .landing-select:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn-limpiar {
+            background: transparent;
+            border: 1px solid #2a2a2a;
+            color: #999;
+            border-radius: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+        .btn-limpiar:hover { border-color: #ff6b35; color: #ff6b35; }
+        .contador-resultados {
+            color: #777;
+            font-size: 0.85rem;
+            margin: -16px 0 22px 2px;
+        }
+
+        /* Ficha del local seleccionado */
+        .ficha-local {
+            background: linear-gradient(135deg, #171717 0%, #101010 100%);
+            border: 1px solid #2a2a2a;
+            border-left: 4px solid #ff6b35;
+            border-radius: 14px;
+            padding: 22px 24px;
+            margin-bottom: 30px;
+        }
+        .ficha-local h2 {
+            margin: 0 0 10px;
+            color: #fff;
+            font-size: 1.9rem;
+            line-height: 1.15;
+            letter-spacing: -0.5px;
+        }
+        .ficha-dato {
+            color: #b8b8b8;
+            font-size: 0.95rem;
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+        }
+        .ficha-dato a { color: #b8b8b8; text-decoration: none; }
+        .ficha-dato a:hover { color: #ff6b35; }
+        .ficha-local .btn-whatsapp {
+            width: auto;
+            margin-top: 16px;
+            padding: 11px 22px;
+            font-size: 0.92rem;
+        }
+
+        /* Datos del local dentro del modal */
+        .modal-local-box {
+            background: #1b1b1b;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin: 0 0 16px;
+        }
+        .modal-local-nombre {
+            margin: 0 0 8px;
+            color: #ff6b35;
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+        .modal-local-dato {
+            color: #a8a8a8;
+            font-size: 0.87rem;
+            margin: 4px 0;
+            display: flex;
+            gap: 8px;
+        }
+        .modal-local-dato a { color: #a8a8a8; text-decoration: none; }
+
+        /* Pie de página */
+        .landing-footer {
+            border-top: 1px solid #1f1f1f;
+            margin-top: 50px;
+            padding: 34px 16px 44px;
+            text-align: center;
+        }
+        .footer-titulo {
+            color: #e8e8e8;
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0 0 6px;
+        }
+        .footer-sub {
+            color: #777;
+            font-size: 0.88rem;
+            margin: 0 0 16px;
+        }
+        .footer-soporte {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            color: #e8e8e8;
+            border-radius: 999px;
+            padding: 12px 24px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+        .footer-soporte:hover { border-color: #25d366; transform: translateY(-2px); }
+        .footer-marca {
+            color: #555;
+            font-size: 0.8rem;
+            margin-top: 26px;
+        }
+
+        @media (max-width: 560px) {
+            .landing-select { flex: 1 1 100%; }
+            .btn-limpiar { flex: 1 1 100%; }
+            .ficha-local h2 { font-size: 1.5rem; }
+        }
     </style>
 </head>
 <body>
@@ -222,10 +372,35 @@
                     <h2>Elegí qué comer hoy</h2>
                 </div>
             </div>
+            <div class="landing-filtros">
+                <div class="buscador-wrap">
+                    <input type="text" id="buscadorLanding" class="landing-input"
+                           placeholder="Buscar plato, promo o local..."
+                           autocomplete="off" oninput="aplicarFiltros()">
+                </div>
+                <select id="filtroCategoria" class="landing-select" onchange="cambiarCategoria()">
+                    <option value="">Todas las categorías</option>
+                </select>
+                <select id="filtroLocal" class="landing-select" onchange="aplicarFiltros()">
+                    <option value="">Todos los locales</option>
+                </select>
+                <button type="button" class="btn-limpiar" onclick="limpiarFiltros()">Limpiar</button>
+            </div>
+
+            <div id="fichaLocal"></div>
+            <div id="contadorResultados" class="contador-resultados"></div>
+
             <div id="categoriasContainer">
                 <div class="estado-carga">Cargando ofertas...</div>
             </div>
         </div>
+
+        <footer class="landing-footer">
+            <p class="footer-titulo">¿Necesitás ayuda con tu pedido?</p>
+            <p class="footer-sub">Escribinos y te respondemos.</p>
+            <div id="soporteContacto"></div>
+            <p class="footer-marca">Deliberisso — la oferta gastronómica de Berisso</p>
+        </footer>
     </div>
 
     <!-- ADMIN + REPARTIDOR SECTION -->
@@ -452,6 +627,18 @@
                         <h4>Total Ganado</h4>
                         <p style="font-size:2.5rem;color:#ff6b35;text-align:center;margin:20px 0;" id="totalAdmin">$0</p>
                     </div>
+
+                    <div class="action-bar" style="margin-top:36px;">
+                        <h3>📱 Teléfono de soporte</h3>
+                    </div>
+                    <div class="card" style="max-width:400px;margin:0 auto;">
+                        <p style="color:#b0b0b0;font-size:0.9rem;margin-bottom:12px;">
+                            Es el número que ven los clientes en el pie de la página pública.
+                        </p>
+                        <input type="text" id="telefonoSoporte" placeholder="Ej: 2214567890" class="input-field">
+                        <button type="button" onclick="guardarTelefonoSoporte()" class="btn-primary" style="width:100%;">Guardar</button>
+                        <div id="soporteMsg" style="margin-top:10px;font-size:0.9rem;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -533,15 +720,21 @@
             cargarLanding();
         }
 
+        let configCache = {};
+
         async function cargarLanding() {
             const f = window.firebaseFunctions;
             try {
-                [categoriasCache, ofertasCache, clientesCache] = await Promise.all([
+                [categoriasCache, ofertasCache, clientesCache, configCache] = await Promise.all([
                     f.getCategorias(),
                     f.getOfertas(),
-                    f.getClientes()
+                    f.getClientes(),
+                    f.getConfig()
                 ]);
                 categoriasCache.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+                poblarFiltroCategorias();
+                poblarFiltroLocales();
+                renderSoporte();
                 renderLanding();
             } catch (error) {
                 console.error('Error cargando la landing:', error);
@@ -550,40 +743,181 @@
             }
         }
 
+        // Escapa texto cargado desde administración para que un apóstrofo o un < en
+        // el nombre de un local no rompa el HTML que armamos por concatenación.
+        function esc(v) {
+            return String(v == null ? '' : v).replace(/[&<>"']/g, c => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+            ));
+        }
+
+        function localPorId(clienteId) {
+            return clientesCache.find(c => c.id === clienteId) || null;
+        }
+
         function nombreLocal(clienteId) {
-            const c = clientesCache.find(c => c.id === clienteId);
+            const c = localPorId(clienteId);
             return c ? c.nombre : '';
+        }
+
+        function ofertasActivas() {
+            return ofertasCache.filter(o => o.activo);
+        }
+
+        // ===== Filtros =====
+
+        function poblarFiltroCategorias() {
+            const sel = document.getElementById('filtroCategoria');
+            const activas = ofertasActivas();
+            const conOfertas = categoriasCache.filter(cat => activas.some(o => o.categoriaId === cat.id));
+            sel.innerHTML = '<option value="">Todas las categorías</option>' +
+                conOfertas.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+        }
+
+        // Los locales dependen de la categoría elegida: solo se listan los que
+        // tienen alguna oferta activa dentro de ella.
+        function poblarFiltroLocales() {
+            const sel = document.getElementById('filtroLocal');
+            const catId = document.getElementById('filtroCategoria').value;
+            const previo = sel.value;
+
+            let activas = ofertasActivas();
+            if (catId) activas = activas.filter(o => String(o.categoriaId) === catId);
+
+            const ids = [...new Set(activas.map(o => o.clienteId))];
+            const locales = ids.map(localPorId).filter(Boolean)
+                .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+            sel.innerHTML = '<option value="">Todos los locales</option>' +
+                locales.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+            sel.disabled = locales.length === 0;
+
+            // Conservar el local elegido si sigue siendo válido en la nueva categoría.
+            if (previo && locales.some(c => String(c.id) === previo)) sel.value = previo;
+        }
+
+        function cambiarCategoria() {
+            poblarFiltroLocales();
+            aplicarFiltros();
+        }
+
+        function limpiarFiltros() {
+            document.getElementById('buscadorLanding').value = '';
+            document.getElementById('filtroCategoria').value = '';
+            poblarFiltroLocales();
+            document.getElementById('filtroLocal').value = '';
+            aplicarFiltros();
+        }
+
+        function aplicarFiltros() {
+            renderFichaLocal();
+            renderLanding();
+        }
+
+        function ofertasFiltradas() {
+            const texto = document.getElementById('buscadorLanding').value.trim().toLowerCase();
+            const catId = document.getElementById('filtroCategoria').value;
+            const localId = document.getElementById('filtroLocal').value;
+
+            return ofertasActivas().filter(o => {
+                if (catId && String(o.categoriaId) !== catId) return false;
+                if (localId && String(o.clienteId) !== localId) return false;
+                if (!texto) return true;
+                const campos = [o.titulo, o.descripcion, nombreLocal(o.clienteId)];
+                return campos.some(c => String(c || '').toLowerCase().includes(texto));
+            });
+        }
+
+        // ===== Render =====
+
+        function renderFichaLocal() {
+            const cont = document.getElementById('fichaLocal');
+            const localId = document.getElementById('filtroLocal').value;
+            if (!localId) { cont.innerHTML = ''; return; }
+
+            const c = localPorId(parseInt(localId));
+            if (!c) { cont.innerHTML = ''; return; }
+
+            const tel = c.telefono ? String(c.telefono).replace(/\D/g, '') : '';
+            const mensaje = encodeURIComponent(`Hola ${c.nombre}! Te escribo desde Deliberisso.`);
+
+            cont.innerHTML = `
+                <div class="ficha-local">
+                    <h2>${esc(c.nombre)}</h2>
+                    ${c.direccion ? `<p class="ficha-dato">📍 <span>${esc(c.direccion)}</span></p>` : ''}
+                    ${c.telefono ? `<p class="ficha-dato">📞 <a href="tel:${esc(tel)}">${esc(c.telefono)}</a></p>` : ''}
+                    ${c.referencia ? `<p class="ficha-dato">💬 <span>${esc(c.referencia)}</span></p>` : ''}
+                    ${tel.length >= 8
+                        ? `<a class="btn-whatsapp" href="https://wa.me/${tel}?text=${mensaje}" target="_blank" rel="noopener noreferrer">Escribir por WhatsApp</a>`
+                        : ''}
+                </div>
+            `;
         }
 
         function renderLanding() {
             const cont = document.getElementById('categoriasContainer');
-            const activas = ofertasCache.filter(o => o.activo);
-            const categoriasConOfertas = categoriasCache.filter(cat => activas.some(o => o.categoriaId === cat.id));
+            const contador = document.getElementById('contadorResultados');
+            const filtradas = ofertasFiltradas();
+            const hayFiltros = document.getElementById('buscadorLanding').value.trim() !== ''
+                || document.getElementById('filtroCategoria').value !== ''
+                || document.getElementById('filtroLocal').value !== '';
 
-            if (categoriasConOfertas.length === 0) {
+            if (ofertasActivas().length === 0) {
+                contador.textContent = '';
                 cont.innerHTML = '<div class="sin-ofertas">Todavía no hay ofertas cargadas. ¡Volvé pronto!</div>';
                 return;
             }
 
-            cont.innerHTML = categoriasConOfertas.map(cat => {
-                const ofertasCat = activas.filter(o => o.categoriaId === cat.id);
+            if (filtradas.length === 0) {
+                contador.textContent = '';
+                cont.innerHTML = '<div class="sin-ofertas">No encontramos ofertas con esa búsqueda.<br>Probá con otra palabra o limpiá los filtros.</div>';
+                return;
+            }
+
+            contador.textContent = hayFiltros
+                ? `${filtradas.length} ${filtradas.length === 1 ? 'oferta encontrada' : 'ofertas encontradas'}`
+                : '';
+
+            // Se mantienen las filas por categoría en todos los casos: es lo que da
+            // el aspecto de catálogo aunque haya filtros activos.
+            const conResultados = categoriasCache.filter(cat => filtradas.some(o => o.categoriaId === cat.id));
+
+            cont.innerHTML = conResultados.map(cat => {
+                const ofertasCat = filtradas.filter(o => o.categoriaId === cat.id);
                 return `
                     <div class="categoria-row">
-                        <h2 class="categoria-titulo">${cat.nombre}</h2>
+                        <h2 class="categoria-titulo">${esc(cat.nombre)}</h2>
                         <div class="poster-scroll">
                             ${ofertasCat.map(o => `
                                 <div class="poster-card" onclick="abrirDetalleOferta(${o.id})">
                                     ${o.imagenUrl
-                                        ? `<img class="poster-img" src="${o.imagenUrl}" alt="${o.titulo}">`
+                                        ? `<img class="poster-img" src="${o.imagenUrl}" alt="${esc(o.titulo)}">`
                                         : `<div class="poster-img poster-placeholder">🍽️</div>`}
-                                    <div class="poster-titulo">${o.titulo}</div>
-                                    <div class="poster-local">${nombreLocal(o.clienteId)}</div>
+                                    <div class="poster-titulo">${esc(o.titulo)}</div>
+                                    <div class="poster-local">${esc(nombreLocal(o.clienteId))}</div>
                                 </div>
                             `).join('')}
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function renderSoporte() {
+            const cont = document.getElementById('soporteContacto');
+            const tel = configCache && configCache.telefonoSoporte
+                ? String(configCache.telefonoSoporte).replace(/\D/g, '') : '';
+
+            if (tel.length < 8) {
+                cont.innerHTML = '<p class="footer-sub">Cargá el teléfono de soporte desde el panel de administración.</p>';
+                return;
+            }
+            const mensaje = encodeURIComponent('Hola! Necesito ayuda con un pedido de Deliberisso.');
+            cont.innerHTML = `
+                <a class="footer-soporte" href="https://wa.me/${tel}?text=${mensaje}" target="_blank" rel="noopener noreferrer">
+                    📱 ${esc(configCache.telefonoSoporte)}
+                </a>
+            `;
         }
 
         function abrirDetalleOferta(id) {
@@ -601,10 +935,14 @@
                     <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">✕</button>
                     ${o.imagenUrl ? `<img class="modal-img" src="${o.imagenUrl}" alt="${o.titulo}">` : ''}
                     <div class="modal-body">
-                        <h2 class="modal-titulo">${o.titulo}</h2>
-                        <p class="modal-local">🏢 ${cliente ? cliente.nombre : 'Local'}</p>
-                        ${o.descripcion ? `<p class="modal-desc">${o.descripcion}</p>` : ''}
-                        ${o.precio != null ? `<p class="modal-precio">$${o.precio}</p>` : ''}
+                        <h2 class="modal-titulo">${esc(o.titulo)}</h2>
+                        ${o.descripcion ? `<p class="modal-desc">${esc(o.descripcion)}</p>` : ''}
+                        ${o.precio != null ? `<p class="modal-precio">$${esc(o.precio)}</p>` : ''}
+                        <div class="modal-local-box">
+                            <p class="modal-local-nombre">${cliente ? esc(cliente.nombre) : 'Local'}</p>
+                            ${cliente && cliente.direccion ? `<p class="modal-local-dato">📍 <span>${esc(cliente.direccion)}</span></p>` : ''}
+                            ${cliente && cliente.telefono ? `<p class="modal-local-dato">📞 <a href="tel:${esc(telefono)}">${esc(cliente.telefono)}</a></p>` : ''}
+                        </div>
                         ${telefono && telefono.length >= 8
                             ? `<a class="btn-whatsapp" href="https://wa.me/${telefono}?text=${mensaje}" target="_blank" rel="noopener noreferrer">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

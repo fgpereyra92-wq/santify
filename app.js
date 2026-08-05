@@ -208,7 +208,35 @@ async function cargarDatosAdmin() {
         await cargarOfertas();
         await cargarHistorial();
         await cargarLiquidacionAdmin();
+        await cargarConfigSoporte();
     } catch (e) { console.error('Error cargando datos admin:', e); }
+}
+
+async function cargarConfigSoporte() {
+    const f = fb();
+    const input = document.getElementById('telefonoSoporte');
+    if (!f || !input) return;
+    const config = await f.getConfig();
+    input.value = config.telefonoSoporte || '';
+}
+
+async function guardarTelefonoSoporte() {
+    const f = fb();
+    const input = document.getElementById('telefonoSoporte');
+    const msg = document.getElementById('soporteMsg');
+    if (!f || !input) return;
+
+    const valor = input.value.trim();
+    if (valor && valor.replace(/\D/g, '').length < 8) {
+        msg.textContent = '❌ El número parece incompleto';
+        msg.style.color = '#dc3545';
+        return;
+    }
+
+    const ok = await f.setConfig({ telefonoSoporte: valor });
+    msg.textContent = ok ? '✅ Guardado' : '❌ No se pudo guardar';
+    msg.style.color = ok ? '#28a745' : '#dc3545';
+    if (ok) setTimeout(() => { msg.textContent = ''; }, 3000);
 }
 
 async function cargarUsuarios() {

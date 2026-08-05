@@ -3,6 +3,11 @@
     ".read": false,
     ".write": false,
 
+    "config": {
+      ".read": true,
+      ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+    },
+
     "categorias": {
       ".read": true
     },

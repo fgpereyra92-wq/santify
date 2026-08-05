@@ -419,6 +419,30 @@ async function deleteCliente(id) {
 }
 
 // ============================================================
+// ⚙️ CONFIGURACIÓN GENERAL (teléfono de soporte de la landing)
+// ============================================================
+
+async function getConfig() {
+    try {
+        const snapshot = await database.ref('config').once('value');
+        return snapshot.val() || {};
+    } catch (error) {
+        console.error('Error obteniendo configuración:', error);
+        return {};
+    }
+}
+
+async function setConfig(data) {
+    try {
+        await database.ref('config').update(data);
+        return true;
+    } catch (error) {
+        console.error('Error guardando configuración:', error);
+        return false;
+    }
+}
+
+// ============================================================
 // 📦 CRUD — CATEGORÍAS (landing estilo Netflix)
 // ============================================================
 
@@ -553,6 +577,8 @@ window.firebaseFunctions = {
     getClientes,
     setCliente,
     deleteCliente,
+    getConfig,
+    setConfig,
     getCategorias,
     setCategoria,
     deleteCategoria,

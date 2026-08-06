@@ -8,6 +8,11 @@
       ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
     },
 
+    "metricas": {
+      ".read": true,
+      ".write": true
+    },
+
     "categorias": {
       ".read": true
     },

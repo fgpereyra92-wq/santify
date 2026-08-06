@@ -443,6 +443,65 @@ async function setConfig(data) {
 }
 
 // ============================================================
+// 📊 MÉTRICAS DE LA LANDING
+// ============================================================
+// Contadores atómicos con ServerValue.increment: dos visitantes simultáneos no
+// se pisan el valor. Nada de esto debe interrumpir al usuario, así que todas las
+// funciones tragan sus errores y nunca se esperan con await desde la interfaz.
+
+function sumarMetrica(ruta, cantidad = 1) {
+    try {
+        return database.ref(ruta).set(firebase.database.ServerValue.increment(cantidad))
+            .catch(e => console.warn('Métrica no registrada:', e.message));
+    } catch (error) {
+        console.warn('Métrica no registrada:', error.message);
+        return Promise.resolve();
+    }
+}
+
+function registrarVistaOferta(ofertaId) {
+    if (ofertaId == null) return;
+    sumarMetrica(`metricas/ofertas/${ofertaId}/vistas`);
+}
+
+function registrarWhatsappOferta(ofertaId, clienteId) {
+    if (ofertaId != null) sumarMetrica(`metricas/ofertas/${ofertaId}/whatsapp`);
+    if (clienteId != null) sumarMetrica(`metricas/locales/${clienteId}/whatsapp`);
+}
+
+function registrarWhatsappLocal(clienteId) {
+    if (clienteId != null) sumarMetrica(`metricas/locales/${clienteId}/whatsapp`);
+}
+
+function registrarFiltroCategoria(categoriaId) {
+    if (categoriaId) sumarMetrica(`metricas/categorias/${categoriaId}/filtros`);
+}
+
+// Lo que la gente busca y no encuentra: dice qué comida falta en la plataforma.
+function registrarBusquedaSinResultado(texto) {
+    const t = String(texto || '').trim().toLowerCase();
+    if (t.length < 3) return;
+    try {
+        database.ref('metricas/busquedasSinResultado').push({
+            texto: t.slice(0, 60),
+            fecha: new Date().toISOString()
+        }).catch(e => console.warn('Búsqueda no registrada:', e.message));
+    } catch (error) {
+        console.warn('Búsqueda no registrada:', error.message);
+    }
+}
+
+async function getMetricas() {
+    try {
+        const snapshot = await database.ref('metricas').once('value');
+        return snapshot.val() || {};
+    } catch (error) {
+        console.error('Error obteniendo métricas:', error);
+        return {};
+    }
+}
+
+// ============================================================
 // 📦 CRUD — CATEGORÍAS (landing estilo Netflix)
 // ============================================================
 
@@ -579,6 +638,12 @@ window.firebaseFunctions = {
     deleteCliente,
     getConfig,
     setConfig,
+    registrarVistaOferta,
+    registrarWhatsappOferta,
+    registrarWhatsappLocal,
+    registrarFiltroCategoria,
+    registrarBusquedaSinResultado,
+    getMetricas,
     getCategorias,
     setCategoria,
     deleteCategoria,

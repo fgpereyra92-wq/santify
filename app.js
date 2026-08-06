@@ -224,6 +224,85 @@ async function cargarConfigSoporte() {
     if (form) form.value = config.formularioRepartidores || '';
 }
 
+async function cargarEstadisticas() {
+    const cont = document.getElementById('estadisticasContenido');
+    const f = fb();
+    if (!cont) return;
+    if (!f || typeof f.getMetricas !== 'function') {
+        cont.innerHTML = '<p style="color:#888;">Recargá la página con Ctrl+F5 para habilitar las estadísticas.</p>';
+        return;
+    }
+
+    cont.innerHTML = '<p style="color:#888;">Cargando...</p>';
+    const [m, ofertas, clientes, categorias] = await Promise.all([
+        f.getMetricas(), f.getOfertas(), f.getClientes(), f.getCategorias()
+    ]);
+
+    const nombreOferta = id => (ofertas.find(o => o.id == id) || {}).titulo || `Oferta #${id}`;
+    const nombreCliente = id => (clientes.find(c => c.id == id) || {}).nombre || `Local #${id}`;
+    const nombreCategoria = id => (categorias.find(c => c.id == id) || {}).nombre || `Categoría #${id}`;
+    const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    // Convierte { id: {campo: n} } en una lista ordenada de mayor a menor.
+    const ranking = (obj, campo) => Object.entries(obj || {})
+        .map(([id, v]) => ({ id, valor: (v && v[campo]) || 0 }))
+        .filter(x => x.valor > 0)
+        .sort((a, b) => b.valor - a.valor);
+
+    const vistas = ranking(m.ofertas, 'vistas');
+    const waOfertas = ranking(m.ofertas, 'whatsapp');
+    const waLocales = ranking(m.locales, 'whatsapp');
+    const filtros = ranking(m.categorias, 'filtros');
+
+    const totalVistas = vistas.reduce((s, x) => s + x.valor, 0);
+    const totalWa = waOfertas.reduce((s, x) => s + x.valor, 0);
+    const conversion = totalVistas > 0 ? Math.round((totalWa / totalVistas) * 100) : 0;
+
+    const busquedas = Object.values(m.busquedasSinResultado || {})
+        .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))
+        .slice(0, 25);
+
+    const lista = (items, fn) => items.length
+        ? '<ol style="margin:0;padding-left:22px;line-height:1.9;">' +
+            items.slice(0, 10).map(x => `<li>${fn(x)}</li>`).join('') + '</ol>'
+        : '<p style="color:#888;margin:0;">Sin datos todavía.</p>';
+
+    cont.innerHTML = `
+        <div class="stats-bar" style="margin-bottom:24px;">
+            <div class="stat-card"><span>👁️ Vistas de ofertas: </span><strong style="color:#ff6b35;">${totalVistas}</strong></div>
+            <div class="stat-card"><span>💬 Clics a WhatsApp: </span><strong style="color:#28a745;">${totalWa}</strong></div>
+            <div class="stat-card"><span>📈 Conversión: </span><strong style="color:#28a745;">${conversion}%</strong></div>
+        </div>
+        <div class="card-grid">
+            <div class="card">
+                <h4>🏆 Ofertas más vistas</h4>
+                ${lista(vistas, x => `${esc(nombreOferta(x.id))} — <strong>${x.valor}</strong>`)}
+            </div>
+            <div class="card">
+                <h4>💬 Locales que más contactos reciben</h4>
+                ${lista(waLocales, x => `${esc(nombreCliente(x.id))} — <strong>${x.valor}</strong>`)}
+            </div>
+            <div class="card">
+                <h4>🍿 Ofertas que más pedidos generan</h4>
+                ${lista(waOfertas, x => `${esc(nombreOferta(x.id))} — <strong>${x.valor}</strong>`)}
+            </div>
+            <div class="card">
+                <h4>🎬 Categorías más filtradas</h4>
+                ${lista(filtros, x => `${esc(nombreCategoria(x.id))} — <strong>${x.valor}</strong>`)}
+            </div>
+            <div class="card">
+                <h4>🔎 Se buscó y no se encontró</h4>
+                <p style="color:#b0b0b0;font-size:0.85rem;margin:0 0 8px;">Comida que te están pidiendo y no tenés cargada.</p>
+                ${busquedas.length
+                    ? '<ul style="margin:0;padding-left:22px;line-height:1.9;">' +
+                        busquedas.map(b => `<li>${esc(b.texto)}</li>`).join('') + '</ul>'
+                    : '<p style="color:#888;margin:0;">Sin datos todavía.</p>'}
+            </div>
+        </div>
+    `;
+}
+
 async function guardarFormularioRepartidores() {
     const f = fb();
     const input = document.getElementById('formularioRepartidores');
@@ -1825,7 +1904,7 @@ function activarSonidoManual() {
 function showTab(tab) {
     document.querySelectorAll('.tab-content').forEach(el => { if (el) el.style.display = 'none'; });
     document.querySelectorAll('.tab-btn').forEach(el => { if (el) el.classList.remove('active'); });
-    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'gps', 'categorias', 'ofertas', 'admin'];
+    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'gps', 'categorias', 'ofertas', 'estadisticas', 'admin'];
     const idx = tabs.indexOf(tab);
     if (idx >= 0) {
         const el = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
@@ -1839,6 +1918,7 @@ function showTab(tab) {
         else if (tab === 'gps') cargarVistaGps();
         else if (tab === 'categorias') cargarCategorias();
         else if (tab === 'ofertas') cargarOfertas();
+        else if (tab === 'estadisticas') cargarEstadisticas();
         else if (tab === 'admin') cargarLiquidacionAdmin();
     }
 }

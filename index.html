@@ -457,7 +457,8 @@
                             <h2>Panel de Administración</h2>
                         </div>
                     </div>
-                    <input type="password" id="adminPassword" placeholder="Clave de Administrador" class="input-field">
+                    <input type="text" id="adminUsuario" placeholder="Usuario" class="input-field" autocapitalize="none" autocorrect="off">
+                    <input type="password" id="adminPassword" placeholder="Contraseña" class="input-field">
                     <button type="button" onclick="loginAdmin()" class="btn-primary">Ingresar</button>
                     <div id="loginError" class="error-message"></div>
 
@@ -775,8 +776,8 @@
     <!-- El ?v= fuerza al navegador a bajar el JS nuevo cuando cambia el HTML.
          Sin esto queda sirviendo scripts viejos de caché y la página falla.
          Subir el número en cada cambio de firebase-config.js o app.js. -->
-    <script src="firebase-config.js?v=4"></script>
-    <script src="app.js?v=4"></script>
+    <script src="firebase-config.js?v=5"></script>
+    <script src="app.js?v=5"></script>
 
     <!-- Cloudflare Web Analytics: mide visitas sin cookies, por eso no hace falta
          cartel de consentimiento. Va con snippet manual porque el tráfico no pasa

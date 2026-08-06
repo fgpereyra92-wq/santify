@@ -5,64 +5,97 @@
 
     "config": {
       ".read": true,
-      ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
-    },
-
-    "metricas": {
-      ".read": true,
-      ".write": true
+      ".write": "root.child('admins').child(auth.uid).val() === true"
     },
 
     "categorias": {
-      ".read": true
+      ".read": true,
+      ".write": "root.child('admins').child(auth.uid).val() === true"
     },
 
     "ofertas": {
-      ".read": true
+      ".read": true,
+      ".write": "root.child('admins').child(auth.uid).val() === true"
     },
 
     "clientes": {
       ".read": true,
-      ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+      ".write": "root.child('admins').child(auth.uid).val() === true"
     },
 
-    "usuarios": {
-      ".read": false,
-      ".write": false,
-      "$uid": {
-        ".read": "auth.uid === $uid || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
-        ".write": "auth.uid === $uid || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
-        "saldo": {
-          ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+    "metricas": {
+      ".read": "root.child('admins').child(auth.uid).val() === true",
+      "ofertas": {
+        "$ofertaId": {
+          "$campo": { ".write": true, ".validate": "newData.isNumber()" }
+        }
+      },
+      "locales": {
+        "$localId": {
+          "$campo": { ".write": true, ".validate": "newData.isNumber()" }
+        }
+      },
+      "categorias": {
+        "$categoriaId": {
+          "$campo": { ".write": true, ".validate": "newData.isNumber()" }
+        }
+      },
+      "busquedasSinResultado": {
+        "$registroId": {
+          ".write": "!data.exists()",
+          ".validate": "newData.hasChildren(['texto', 'fecha'])"
         }
       }
     },
 
+    "admins": {
+      ".read": "auth != null",
+      ".write": false
+    },
+
+    "uidIndex": {
+      ".read": "auth != null",
+      ".write": "root.child('admins').child(auth.uid).val() === true"
+    },
+
+    "usuarios": {
+      ".read": "root.child('admins').child(auth.uid).val() === true",
+      ".write": "root.child('admins').child(auth.uid).val() === true",
+      "$id": {
+        ".read": "root.child('admins').child(auth.uid).val() === true || root.child('usuarios').child($id).child('uid').val() === auth.uid",
+        ".write": "root.child('admins').child(auth.uid).val() === true || root.child('usuarios').child($id).child('uid').val() === auth.uid"
+      }
+    },
+
     "pedidos": {
-      ".read": false,
-      ".write": false,
+      ".read": "auth != null",
+      ".write": "auth != null",
       "$pedidoId": {
-        ".read": "root.child('pedidos').child($pedidoId).child('usuarioAsignado').val() === auth.uid || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
-        ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+        ".validate": "newData.hasChildren(['descripcion'])"
       }
     },
 
     "liquidaciones": {
-      ".read": false,
-      ".write": false,
+      ".read": "root.child('admins').child(auth.uid).val() === true",
+      ".write": "root.child('admins').child(auth.uid).val() === true",
       "$userId": {
-        ".read": "auth.uid === $userId || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
-        ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
+        ".read": "root.child('admins').child(auth.uid).val() === true || root.child('usuarios').child($userId).child('uid').val() === auth.uid"
       }
     },
 
+    "historialLiquidaciones": {
+      ".read": "auth != null",
+      ".write": "root.child('admins').child(auth.uid).val() === true"
+    },
+
+    "liquidacionAdmin": {
+      ".read": "root.child('admins').child(auth.uid).val() === true",
+      ".write": "root.child('admins').child(auth.uid).val() === true"
+    },
+
     "historial": {
-      ".read": false,
-      ".write": false,
-      "$historialId": {
-        ".read": "root.child('historial').child($historialId).child('usuarioId').val() === auth.uid || root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'",
-        ".write": "root.child('usuarios').child(auth.uid).child('email').val() === 'admin@deliberisso.local'"
-      }
+      ".read": "auth != null",
+      ".write": "root.child('admins').child(auth.uid).val() === true"
     }
   }
 }

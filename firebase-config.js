@@ -177,84 +177,81 @@ function activarSonidoManual() {
 // 🔐 AUTENTICACIÓN CON FIREBASE AUTH
 // ============================================================
 
-const ADMIN_PASSWORD = 'LedZepp1';
+// Todas las cuentas viven en Firebase Auth. Ya no hay ninguna contraseña en este
+// archivo: el navegador lo descarga entero, así que cualquier clave escrita acá
+// sería pública. Quien se autentica recibe un uid, y las reglas de la base deciden
+// qué puede ver según ese uid.
 
-async function registrarRepartidor(email, password, nombre, vehiculo = 'moto') {
+// Los repartidores escriben solo su usuario, no un email. Se completa acá para que
+// Firebase Auth, que exige formato de email, lo acepte.
+const DOMINIO_CUENTAS = '@deliberisso.com.ar';
+
+function aEmail(identificador) {
+    const id = String(identificador || '').trim();
+    return id.includes('@') ? id : id + DOMINIO_CUENTAS;
+}
+
+async function loginAdmin(usuario, clave) {
     try {
-        const userCred = await auth.createUserWithEmailAndPassword(email, password);
-        const uid = userCred.user.uid;
+        const cred = await auth.signInWithEmailAndPassword(aEmail(usuario), clave);
+        const uid = cred.user.uid;
 
-        await database.ref(`usuarios/${uid}`).set({
-            id: uid,
-            nombre,
-            email,
-            username: email,
-            vehiculo,
-            saldo: 0,
-            estado: 'disponible',
-            activo: true,
-            createdAt: new Date().toISOString()
-        });
-
-        return { success: true, uid, user: userCred.user };
+        // Autenticarse no alcanza: hay que estar en la lista de administradores.
+        const snap = await database.ref('admins/' + uid).once('value');
+        if (!snap.val()) {
+            await auth.signOut();
+            return { success: false, error: 'Esta cuenta no tiene permisos de administrador' };
+        }
+        return { success: true, role: 'admin', uid };
     } catch (error) {
-        console.error('Error registrando repartidor:', error);
-        return { success: false, error: error.message };
+        console.error('Error en login admin:', error.code || error.message);
+        return { success: false, error: 'Usuario o contraseña incorrectos' };
     }
 }
 
-// Acepta email (cuenta de Firebase Auth) o usuario clásico guardado en la base.
-// Los repartidores existentes usan usuario/contraseña, así que ese camino es el que
-// mantiene el acceso mientras no se migren todas las cuentas a Firebase Auth.
 async function loginRepartidor(identificador, password) {
-    const id = (identificador || '').trim();
-
-    if (!id.includes('@')) {
-        return loginRepartidorClasico(id, password);
-    }
-
     try {
-        const userCred = await auth.signInWithEmailAndPassword(id, password);
-        const uid = userCred.user.uid;
+        const cred = await auth.signInWithEmailAndPassword(aEmail(identificador), password);
+        const uid = cred.user.uid;
 
-        const snap = await database.ref(`usuarios/${uid}`).once('value');
-        const usuario = snap.val();
-
-        if (!usuario) {
+        // uidIndex traduce el uid de Firebase al id numérico histórico, que es el que
+        // referencian pedidos e historial de liquidaciones.
+        const idSnap = await database.ref('uidIndex/' + uid).once('value');
+        const id = idSnap.val();
+        if (id == null) {
             await auth.signOut();
-            return { success: false, error: 'Usuario no encontrado en BD' };
+            return { success: false, error: 'Esta cuenta no está habilitada como repartidor' };
         }
 
-        return { success: true, uid, user: { id: uid, ...usuario }, authUser: userCred.user };
+        const snap = await database.ref('usuarios/' + id).once('value');
+        const usuario = snap.val();
+        if (!usuario) {
+            await auth.signOut();
+            return { success: false, error: 'No encontramos tus datos' };
+        }
+
+        return { success: true, uid, user: { id: parseInt(id), ...usuario } };
     } catch (error) {
-        console.error('Error en login repartidor:', error);
-        return { success: false, error: 'Email o contraseña incorrectos' };
+        console.error('Error en login repartidor:', error.code || error.message);
+        return { success: false, error: 'Usuario o contraseña incorrectos' };
     }
 }
 
-async function loginRepartidorClasico(username, password) {
+// La sesión de Firebase se restaura de forma asincrónica al cargar la página. Esto
+// permite esperarla antes de decidir si una sesión guardada sigue siendo válida.
+function esperarAuth() {
+    return new Promise(resolve => {
+        const off = auth.onAuthStateChanged(user => { off(); resolve(user); });
+    });
+}
+
+async function esAdminActual() {
+    const user = auth.currentUser;
+    if (!user) return false;
     try {
-        const snapshot = await database.ref('usuarios').once('value');
-        const data = snapshot.val();
-        if (!data) return { success: false, error: 'Usuario o contraseña incorrectos' };
-
-        const key = Object.keys(data).find(k =>
-            data[k].username === username && data[k].password === password
-        );
-        if (!key) return { success: false, error: 'Usuario o contraseña incorrectos' };
-
-        return { success: true, user: { id: parseInt(key), ...data[key] } };
-    } catch (error) {
-        console.error('Error en login repartidor (clásico):', error);
-        return { success: false, error: 'Error de conexión' };
-    }
-}
-
-async function loginAdmin(clave) {
-    if (clave === ADMIN_PASSWORD) {
-        return { success: true, role: 'admin' };
-    }
-    return { success: false, error: 'Clave incorrecta' };
+        const snap = await database.ref('admins/' + user.uid).once('value');
+        return !!snap.val();
+    } catch (e) { return false; }
 }
 
 async function logoutUsuario() {
@@ -660,7 +657,8 @@ window.firebaseFunctions = {
     activarSonidoManual,
     reproducirSonido,
     prepararAudio,
-    registrarRepartidor,
+    esperarAuth,
+    esAdminActual,
     loginRepartidor,
     loginAdmin,
     logoutUsuario,

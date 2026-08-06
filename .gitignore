@@ -5,3 +5,7 @@ archivos 2026 07 29/
 
 # Datos de prueba locales, no usados por la app
 datos.json
+
+# Backups de la base: contienen datos de clientes y credenciales.
+# NUNCA subir a un repositorio publico.
+backups/

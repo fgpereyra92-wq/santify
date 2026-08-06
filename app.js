@@ -77,6 +77,7 @@ function limpiarSesion() { sessionStorage.removeItem('admin'); sessionStorage.re
 // ============================================================
 
 async function loginAdmin() {
+    const usuario = document.getElementById('adminUsuario').value;
     const pass = document.getElementById('adminPassword').value;
     const errorEl = document.getElementById('loginError');
 
@@ -87,7 +88,7 @@ async function loginAdmin() {
             return;
         }
 
-        const result = await f.loginAdmin(pass);
+        const result = await f.loginAdmin(usuario, pass);
         if (result.success) {
             guardarSesionAdmin(true);
             const loginSection = document.getElementById('loginSection');
@@ -97,6 +98,7 @@ async function loginAdmin() {
             await cargarDatosAdmin();
             iniciarPollingAdmin();
             document.getElementById('adminPassword').value = '';
+            document.getElementById('adminUsuario').value = '';
             if (errorEl) errorEl.textContent = '';
         } else {
             if (errorEl) errorEl.textContent = '❌ Clave incorrecta';
@@ -2108,8 +2110,6 @@ function hideForm(tipo) {
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚚 Deliberisso');
-    console.log('Admin: LedZepp1');
-    console.log('Usuarios: carlos123, maria456, julio789');
     console.log('🔊 Para activar el sonido, toca el botón "Activar Sonido" o la pantalla');
 
     if (typeof window.firebaseFunctions === 'undefined') {
@@ -2124,7 +2124,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function iniciarSistema() {
+async function iniciarSistema() {
     // Detectar ruta actual y ocultar login innecesario
     const ruta = window.currentRoute || window.location.pathname;
     if (ruta === '/repartidores') {
@@ -2139,6 +2139,17 @@ function iniciarSistema() {
     // abierta en la misma pestaña se filtra en /repartidores (y al revés).
     const permiteAdmin = ruta !== '/repartidores';
     const permiteUsuario = ruta !== '/admin';
+
+    // La sesión guardada en el navegador no alcanza: si Firebase ya no reconoce al
+    // usuario, la base le va a negar todo y el panel abriría vacío. Se descarta y
+    // se pide login de nuevo.
+    const f = fb();
+    if (f && typeof f.esperarAuth === 'function') {
+        const authUser = await f.esperarAuth();
+        if (!authUser && (obtenerSesionAdmin() || obtenerSesionUsuario())) {
+            limpiarSesion();
+        }
+    }
 
     if (permiteAdmin && obtenerSesionAdmin()) {
         const loginSection = document.getElementById('loginSection');

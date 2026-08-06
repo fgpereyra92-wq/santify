@@ -348,10 +348,38 @@
             transition: border-color 0.2s ease, transform 0.2s ease;
         }
         .footer-soporte:hover { border-color: #25d366; transform: translateY(-2px); }
+        .footer-bloques {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 20px 56px;
+        }
+        .footer-bloque { flex: 1 1 280px; max-width: 380px; }
+        .footer-repartidor {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            background: #ff6b35;
+            color: #14100d;
+            border: 1px solid #ff6b35;
+            border-radius: 999px;
+            padding: 12px 24px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 10px 26px rgba(255, 107, 53, 0.22);
+        }
+        .footer-repartidor:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(255, 107, 53, 0.3);
+        }
         .footer-marca {
             color: #555;
             font-size: 0.8rem;
-            margin-top: 26px;
+            margin-top: 34px;
+            padding-top: 22px;
+            border-top: 1px solid #1a1a1a;
         }
 
         @media (max-width: 560px) {
@@ -396,9 +424,19 @@
         </div>
 
         <footer class="landing-footer">
-            <p class="footer-titulo">¿Necesitás ayuda con tu pedido?</p>
-            <p class="footer-sub">Escribinos y te respondemos.</p>
-            <div id="soporteContacto"></div>
+            <div class="footer-bloques">
+                <div class="footer-bloque">
+                    <p class="footer-titulo">¿Necesitás ayuda con tu pedido?</p>
+                    <p class="footer-sub">Escribinos y te respondemos.</p>
+                    <div id="soporteContacto"></div>
+                </div>
+
+                <div class="footer-bloque">
+                    <p class="footer-titulo">¿Querés ser repartidor en Deliberisso?</p>
+                    <p class="footer-sub">Sumate al equipo. Completá el formulario y te contactamos.</p>
+                    <div id="repartidorContacto"></div>
+                </div>
+            </div>
             <p class="footer-marca">Deliberisso — la oferta gastronómica de Berisso</p>
         </footer>
     </div>
@@ -639,6 +677,18 @@
                         <button type="button" onclick="guardarTelefonoSoporte()" class="btn-primary" style="width:100%;">Guardar</button>
                         <div id="soporteMsg" style="margin-top:10px;font-size:0.9rem;"></div>
                     </div>
+
+                    <div class="action-bar" style="margin-top:36px;">
+                        <h3>🛵 Formulario de repartidores</h3>
+                    </div>
+                    <div class="card" style="max-width:400px;margin:0 auto;">
+                        <p style="color:#b0b0b0;font-size:0.9rem;margin-bottom:12px;">
+                            Adónde lleva el botón "Quiero postularme" del pie de la página pública.
+                        </p>
+                        <input type="text" id="formularioRepartidores" placeholder="https://docs.google.com/forms/..." class="input-field">
+                        <button type="button" onclick="guardarFormularioRepartidores()" class="btn-primary" style="width:100%;">Guardar</button>
+                        <div id="formularioMsg" style="margin-top:10px;font-size:0.9rem;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -711,8 +761,8 @@
     <!-- El ?v= fuerza al navegador a bajar el JS nuevo cuando cambia el HTML.
          Sin esto queda sirviendo scripts viejos de caché y la página falla.
          Subir el número en cada cambio de firebase-config.js o app.js. -->
-    <script src="firebase-config.js?v=2"></script>
-    <script src="app.js?v=2"></script>
+    <script src="firebase-config.js?v=3"></script>
+    <script src="app.js?v=3"></script>
     <script>
         // Landing functions
         function iniciarLanding() {
@@ -724,6 +774,10 @@
         }
 
         let configCache = {};
+
+        // Se usa si nadie cargó una URL distinta desde el panel de administración.
+        const FORM_REPARTIDORES_POR_DEFECTO =
+            'https://docs.google.com/forms/d/e/1FAIpQLSfCm00JcmtYl0GbgbS8rwqcju6-kN5yDcoFt1qVAEpcvrXFHA/viewform';
 
         async function cargarLanding() {
             const f = window.firebaseFunctions;
@@ -745,6 +799,7 @@
                 poblarFiltroCategorias();
                 poblarFiltroLocales();
                 renderSoporte();
+                renderRepartidor();
                 renderLanding();
             } catch (error) {
                 console.error('Error cargando la landing:', error);
@@ -926,6 +981,23 @@
             cont.innerHTML = `
                 <a class="footer-soporte" href="https://wa.me/${tel}?text=${mensaje}" target="_blank" rel="noopener noreferrer">
                     📱 ${esc(configCache.telefonoSoporte)}
+                </a>
+            `;
+        }
+
+        function renderRepartidor() {
+            const cont = document.getElementById('repartidorContacto');
+            const url = (configCache && configCache.formularioRepartidores)
+                ? String(configCache.formularioRepartidores).trim()
+                : FORM_REPARTIDORES_POR_DEFECTO;
+
+            // Solo enlaces http(s): evita que una URL mal cargada termine en un
+            // javascript: dentro del href.
+            if (!/^https?:\/\//i.test(url)) { cont.innerHTML = ''; return; }
+
+            cont.innerHTML = `
+                <a class="footer-repartidor" href="${esc(url)}" target="_blank" rel="noopener noreferrer">
+                    🛵 Quiero postularme
                 </a>
             `;
         }

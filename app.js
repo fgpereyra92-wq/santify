@@ -214,10 +214,33 @@ async function cargarDatosAdmin() {
 
 async function cargarConfigSoporte() {
     const f = fb();
-    const input = document.getElementById('telefonoSoporte');
-    if (!f || !input) return;
+    if (!f || typeof f.getConfig !== 'function') return;
     const config = await f.getConfig();
-    input.value = config.telefonoSoporte || '';
+
+    const tel = document.getElementById('telefonoSoporte');
+    if (tel) tel.value = config.telefonoSoporte || '';
+
+    const form = document.getElementById('formularioRepartidores');
+    if (form) form.value = config.formularioRepartidores || '';
+}
+
+async function guardarFormularioRepartidores() {
+    const f = fb();
+    const input = document.getElementById('formularioRepartidores');
+    const msg = document.getElementById('formularioMsg');
+    if (!f || !input) return;
+
+    const valor = input.value.trim();
+    if (valor && !/^https?:\/\//i.test(valor)) {
+        msg.textContent = '❌ Tiene que empezar con http:// o https://';
+        msg.style.color = '#dc3545';
+        return;
+    }
+
+    const ok = await f.setConfig({ formularioRepartidores: valor });
+    msg.textContent = ok ? '✅ Guardado' : '❌ No se pudo guardar';
+    msg.style.color = ok ? '#28a745' : '#dc3545';
+    if (ok) setTimeout(() => { msg.textContent = ''; }, 3000);
 }
 
 async function guardarTelefonoSoporte() {

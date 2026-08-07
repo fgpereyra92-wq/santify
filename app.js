@@ -226,6 +226,173 @@ async function cargarConfigSoporte() {
     if (form) form.value = config.formularioRepartidores || '';
 }
 
+// ============================================================
+// 📢 BANNERS DE PUBLICIDAD
+// ============================================================
+
+let bannersCache = [];
+
+function previsualizarImagenBanner(event) {
+    const preview = document.getElementById('bannerImagenPreview');
+    if (!preview) return;
+    const file = event.target.files[0];
+    if (!file) { preview.style.display = 'none'; return; }
+    const img = preview.querySelector('img');
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(file);
+}
+
+async function crearBanner() {
+    const titulo = document.getElementById('bannerTitulo').value.trim();
+    const link = document.getElementById('bannerLink').value.trim();
+    const lado = document.getElementById('bannerLado').value;
+    const fileInput = document.getElementById('bannerImagenInput');
+    const file = fileInput && fileInput.files[0];
+
+    if (!titulo) { alert('Poné un nombre para reconocerlo (ej: "Panadería López")'); return; }
+    if (!file) { alert('Falta la imagen del banner'); return; }
+    if (link && !/^https?:\/\//i.test(link)) { alert('El enlace tiene que empezar con http:// o https://'); return; }
+
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+
+    let imagenUrl = '';
+    try {
+        // Formato vertical tipo rascacielos: es el que entra a los costados.
+        imagenUrl = await redimensionarImagenOferta(file, 300, 600, 0.8);
+    } catch (error) {
+        alert('No se pudo procesar la imagen');
+        return;
+    }
+
+    const id = await f.getNextId('banners');
+    await f.setBanner(id, { titulo, link, lado, imagenUrl, activo: true });
+
+    hideForm('banner');
+    ['bannerTitulo', 'bannerLink'].forEach(x => { const el = document.getElementById(x); if (el) el.value = ''; });
+    if (fileInput) fileInput.value = '';
+    const prev = document.getElementById('bannerImagenPreview');
+    if (prev) prev.style.display = 'none';
+    await cargarBanners();
+}
+
+async function cargarBanners() {
+    const f = fb();
+    const cont = document.getElementById('listaBanners');
+    if (!f || !cont || typeof f.getBanners !== 'function') return;
+
+    bannersCache = await f.getBanners();
+    if (bannersCache.length === 0) {
+        cont.innerHTML = '<p style="color:#888;">Todavía no hay banners cargados.</p>';
+        return;
+    }
+
+    cont.innerHTML = bannersCache.map(b => `
+        <div class="card">
+            <img src="${b.imagenUrl}" alt="${b.titulo}" style="width:100%;max-width:150px;border-radius:8px;border:1px solid #2a2a2a;display:block;margin-bottom:10px;">
+            <h4 style="margin:0 0 6px;">${b.titulo}</h4>
+            <p style="color:#b0b0b0;font-size:0.85rem;margin:0 0 4px;">
+                Lado: ${b.lado === 'izquierda' ? '⬅️ Izquierda' : '➡️ Derecha'}
+            </p>
+            ${b.link ? `<p style="color:#888;font-size:0.8rem;margin:0 0 10px;word-break:break-all;">🔗 ${b.link}</p>` : '<p style="color:#666;font-size:0.8rem;margin:0 0 10px;">Sin enlace</p>'}
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" onclick="toggleBannerActivo(${b.id})" class="${b.activo ? 'btn-warning' : 'btn-success'}">
+                    ${b.activo ? '👁️ Visible' : '🚫 Oculto'}
+                </button>
+                <button type="button" onclick="eliminarBanner(${b.id})" class="btn-danger">Eliminar</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function toggleBannerActivo(id) {
+    const f = fb();
+    const b = bannersCache.find(x => x.id === id);
+    if (!f || !b) return;
+    await f.setBanner(id, { ...b, activo: !b.activo });
+    await cargarBanners();
+}
+
+async function eliminarBanner(id) {
+    const b = bannersCache.find(x => x.id === id);
+    if (!confirm(`¿Eliminar el banner "${b ? b.titulo : id}"?`)) return;
+    const f = fb();
+    if (!f) return;
+    await f.deleteBanner(id);
+    await cargarBanners();
+}
+
+// ============================================================
+// 💼 LIQUIDACIÓN DEL ADMINISTRADOR
+// ============================================================
+
+async function pagarLiquidacionAdmin() {
+    const f = fb();
+    if (!f) { alert('Error de conexión'); return; }
+
+    const total = liquidacionAdmin.total || 0;
+    if (total <= 0) { alert('No hay nada para liquidar'); return; }
+    if (!confirm(`¿Registrar el retiro de $${total}?\n\nEl total vuelve a cero y queda asentado en el historial.`)) return;
+
+    try {
+        const historial = await f.getHistorialAdmin();
+        historial.push({
+            monto: total,
+            fecha: new Date().toISOString(),
+            detalle: 'Retiro de ganancias del administrador'
+        });
+
+        // El total se pone en cero solo si el registro quedó guardado. Al revés se
+        // perdería el monto sin dejar rastro de que se retiró.
+        const guardado = await f.setHistorialAdmin(historial);
+        if (!guardado) {
+            alert('❌ No se pudo guardar el registro del retiro.\n\nEl total quedó intacto: no se perdió nada.');
+            return;
+        }
+
+        liquidacionAdmin.total = 0;
+        await f.setLiquidacionAdmin(liquidacionAdmin);
+
+        await cargarLiquidacionAdmin();
+        alert('✅ Liquidación registrada');
+    } catch (error) {
+        console.error('Error liquidando al admin:', error);
+        alert('Error al registrar la liquidación. El total no se modificó.');
+    }
+}
+
+async function renderHistorialAdmin() {
+    const cont = document.getElementById('historialAdmin');
+    const f = fb();
+    if (!cont || !f || typeof f.getHistorialAdmin !== 'function') return;
+
+    const historial = (await f.getHistorialAdmin())
+        .slice()
+        .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+
+    if (historial.length === 0) {
+        cont.innerHTML = '<p style="color:#888;margin:0;">Todavía no registraste ningún retiro.</p>';
+        return;
+    }
+
+    const totalRetirado = historial.reduce((s, h) => s + (h.monto || 0), 0);
+    cont.innerHTML = `
+        <p style="color:#b0b0b0;font-size:0.9rem;margin:0 0 12px;">
+            Total retirado histórico: <strong style="color:#28a745;">$${totalRetirado}</strong>
+            · ${historial.length} ${historial.length === 1 ? 'retiro' : 'retiros'}
+        </p>
+        <ul style="margin:0;padding-left:20px;line-height:2;">
+            ${historial.map(h => `
+                <li>
+                    <strong style="color:#28a745;">$${h.monto || 0}</strong>
+                    <span style="color:#888;"> — ${new Date(h.fecha).toLocaleString('es-AR')}</span>
+                </li>
+            `).join('')}
+        </ul>
+    `;
+}
+
 async function cargarEstadisticas() {
     const cont = document.getElementById('estadisticasContenido');
     const f = fb();
@@ -394,6 +561,7 @@ async function cargarLiquidacionAdmin() {
     liquidacionAdmin = await f.getLiquidacionAdmin();
     const el = document.getElementById('totalAdmin');
     if (el) el.textContent = '$' + (liquidacionAdmin.total || 0);
+    await renderHistorialAdmin();
 }
 
 // ============================================================
@@ -460,12 +628,15 @@ function renderClientes(clientes) {
             <div class="list-section-title">Clientes</div>
             ${clientes.map(c => `
                 <div class="list-row">
-                    <div class="list-row-main">
+                    <div class="list-row-main" style="display:flex;gap:12px;align-items:flex-start;">
+                        ${c.logoUrl ? `<img src="${c.logoUrl}" alt="${c.nombre}" style="width:52px;height:52px;border-radius:10px;object-fit:cover;border:1px solid #2a2a2a;flex-shrink:0;">` : ''}
+                        <div>
                         <strong>${c.nombre}</strong>
                         <div>📍 ${c.direccion || 'Sin dirección'}</div>
                         <div>📞 ${c.telefono || 'Sin teléfono'}</div>
                         ${c.referencia ? `<div>📝 ${c.referencia}</div>` : ''}
                         <div class="badge ${c.activo ? 'badge-active' : 'badge-inactive'}">${c.activo ? '✅ Activo' : '❌ Inactivo'}</div>
+                        </div>
                     </div>
                     <div class="list-row-actions">
                         <button onclick="editarCliente(${c.id})" class="btn-secondary">✏️ Editar</button>
@@ -891,11 +1062,65 @@ async function crearCliente() {
     if (!nombre || !direccion) { alert('Nombre y dirección son obligatorios'); return; }
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
+
+    const fileInput = document.getElementById('clienteLogoInput');
+    const file = fileInput && fileInput.files[0];
+    let logoUrl = '';
+    if (file) {
+        try {
+            logoUrl = await redimensionarLogoCuadrado(file);
+        } catch (error) {
+            alert('No se pudo procesar el logo. Se guarda el local sin logo.');
+        }
+    }
+
     const id = await f.getNextId('clientes');
-    await f.setCliente(id, { nombre, direccion, telefono, email, referencia, activo: true });
+    await f.setCliente(id, { nombre, direccion, telefono, email, referencia, logoUrl, activo: true });
     hideForm('cliente');
     ['clienteNombre','clienteDireccion','clienteTelefono','clienteEmail','clienteReferencia'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    if (fileInput) fileInput.value = '';
+    const prev = document.getElementById('clienteLogoPreview');
+    if (prev) prev.style.display = 'none';
     await cargarClientes();
+}
+
+function previsualizarLogoCliente(event) {
+    const preview = document.getElementById('clienteLogoPreview');
+    if (!preview) return;
+    const file = event.target.files[0];
+    if (!file) { preview.style.display = 'none'; return; }
+    const img = preview.querySelector('img');
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(file);
+}
+
+// Recorta el logo a un cuadrado tomando la zona central y lo deja en 200x200.
+// Así todos los locales se ven parejos en la landing, sin deformar la imagen.
+function redimensionarLogoCuadrado(file, lado = 200, calidad = 0.85) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                const corte = Math.min(img.width, img.height);
+                const sx = Math.round((img.width - corte) / 2);
+                const sy = Math.round((img.height - corte) / 2);
+                const canvas = document.createElement('canvas');
+                canvas.width = lado;
+                canvas.height = lado;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#141414';
+                ctx.fillRect(0, 0, lado, lado);
+                ctx.drawImage(img, sx, sy, corte, corte, 0, 0, lado, lado);
+                resolve(canvas.toDataURL('image/jpeg', calidad));
+            };
+            img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+            img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+        reader.readAsDataURL(file);
+    });
 }
 
 function editarCliente(id) {
@@ -916,6 +1141,10 @@ function editarCliente(id) {
             <input type="text" id="editClienteTelefono" placeholder="Teléfono" class="input-field" value="${c.telefono || ''}">
             <input type="email" id="editClienteEmail" placeholder="Email" class="input-field" value="${c.email || ''}">
             <input type="text" id="editClienteReferencia" placeholder="Referencia / detalle (opcional)" class="input-field" value="${c.referencia || ''}">
+            <label style="display:block;margin:10px 0 4px;color:#b0b0b0;font-size:0.9rem;">Logo del local (cuadrado)</label>
+            ${c.logoUrl ? `<img src="${c.logoUrl}" alt="Logo actual" style="width:80px;height:80px;border-radius:10px;object-fit:cover;border:1px solid #2a2a2a;display:block;margin-bottom:8px;">` : ''}
+            <input type="file" id="editClienteLogoInput" accept="image/*" class="input-field">
+            <p style="color:#888;font-size:0.8rem;margin:0 0 8px;">Dejalo vacío para conservar el logo actual.</p>
             <div class="form-actions">
                 <button type="button" onclick="guardarEdicionCliente(${id})" class="btn-primary">Guardar</button>
                 <button type="button" onclick="this.closest('.modal-overlay').remove()" class="btn-secondary">Cancelar</button>
@@ -936,7 +1165,17 @@ async function guardarEdicionCliente(id) {
     if (!nombre || !direccion) { alert('Nombre y dirección son obligatorios'); return; }
     const f = fb();
     if (!f) { alert('Error de conexión'); return; }
-    await f.setCliente(id, { ...c, nombre, direccion, telefono, email, referencia });
+
+    // Si no cargó una imagen nueva, se conserva la que ya tenía.
+    let logoUrl = c.logoUrl || '';
+    const fileInput = document.getElementById('editClienteLogoInput');
+    const file = fileInput && fileInput.files[0];
+    if (file) {
+        try { logoUrl = await redimensionarLogoCuadrado(file); }
+        catch (error) { alert('No se pudo procesar el logo. Se conserva el anterior.'); }
+    }
+
+    await f.setCliente(id, { ...c, nombre, direccion, telefono, email, referencia, logoUrl });
     const modal = document.querySelector('.modal-overlay');
     if (modal) modal.remove();
     await cargarClientes();
@@ -1906,7 +2145,7 @@ function activarSonidoManual() {
 function showTab(tab) {
     document.querySelectorAll('.tab-content').forEach(el => { if (el) el.style.display = 'none'; });
     document.querySelectorAll('.tab-btn').forEach(el => { if (el) el.classList.remove('active'); });
-    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'gps', 'categorias', 'ofertas', 'estadisticas', 'admin'];
+    const tabs = ['usuarios', 'clientes', 'pedidos', 'liquidaciones', 'gps', 'categorias', 'ofertas', 'banners', 'estadisticas', 'admin'];
     const idx = tabs.indexOf(tab);
     if (idx >= 0) {
         const el = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
@@ -1920,6 +2159,7 @@ function showTab(tab) {
         else if (tab === 'gps') cargarVistaGps();
         else if (tab === 'categorias') cargarCategorias();
         else if (tab === 'ofertas') cargarOfertas();
+        else if (tab === 'banners') cargarBanners();
         else if (tab === 'estadisticas') cargarEstadisticas();
         else if (tab === 'admin') cargarLiquidacionAdmin();
     }
@@ -2093,13 +2333,13 @@ function seleccionarUsuarioGPS(id) {
 
 
 function showForm(tipo) {
-    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm', categoria: 'categoriaForm', oferta: 'ofertaForm' };
+    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm', categoria: 'categoriaForm', oferta: 'ofertaForm', banner: 'bannerForm' };
     const el = document.getElementById(map[tipo]);
     if (el) el.style.display = 'block';
 }
 
 function hideForm(tipo) {
-    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm', categoria: 'categoriaForm', oferta: 'ofertaForm' };
+    const map = { usuario: 'usuarioForm', pedido: 'pedidoForm', cliente: 'clienteForm', categoria: 'categoriaForm', oferta: 'ofertaForm', banner: 'bannerForm' };
     const el = document.getElementById(map[tipo]);
     if (el) el.style.display = 'none';
 }

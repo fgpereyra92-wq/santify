@@ -382,16 +382,91 @@
             border-top: 1px solid #1a1a1a;
         }
 
+        /* Logo del local */
+        .local-logo {
+            width: 72px;
+            height: 72px;
+            border-radius: 14px;
+            object-fit: cover;
+            border: 1px solid #2a2a2a;
+            background: #141414;
+            flex-shrink: 0;
+        }
+        .ficha-encabezado {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        .modal-local-encabezado {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .modal-local-encabezado .local-logo { width: 48px; height: 48px; border-radius: 10px; }
+        .poster-local-logo {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            object-fit: cover;
+            vertical-align: -3px;
+            margin-right: 5px;
+        }
+
+        /* Banners laterales: solo en pantallas anchas, para no tapar el catálogo */
+        .banner-columna {
+            position: fixed;
+            top: 90px;
+            width: 160px;
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 5;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+        .banner-columna::-webkit-scrollbar { display: none; }
+        .banner-columna.izquierda { left: 16px; }
+        .banner-columna.derecha { right: 16px; }
+        .banner-item {
+            display: block;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #232323;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .banner-item:hover { transform: translateY(-2px); border-color: #ff6b35; }
+        .banner-item img { width: 100%; display: block; }
+        .banner-leyenda {
+            font-size: 0.62rem;
+            color: #5a5a5a;
+            text-align: center;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        /* 1560px = 1200 de contenido + 2 columnas de 160 + margen */
+        @media (min-width: 1560px) {
+            .banner-columna { display: flex; }
+        }
+
         @media (max-width: 560px) {
             .landing-select { flex: 1 1 100%; }
             .btn-limpiar { flex: 1 1 100%; }
             .ficha-local h2 { font-size: 1.5rem; }
+            .ficha-encabezado { gap: 12px; }
+            .local-logo { width: 56px; height: 56px; }
         }
     </style>
 </head>
 <body>
     <!-- LANDING SECTION -->
     <div id="landingSection" style="display: none;">
+        <aside class="banner-columna izquierda" id="bannersIzquierda"></aside>
+        <aside class="banner-columna derecha" id="bannersDerecha"></aside>
+
         <div class="landing-container">
             <div class="landing-hero">
                 <img class="appLogo" src="logo.png" alt="Deliberisso Logo">
@@ -517,6 +592,7 @@
                     <button type="button" class="tab-btn" onclick="showTab('gps')">🛰️ GPS</button>
                     <button type="button" class="tab-btn" onclick="showTab('categorias')">🎬 Categorías</button>
                     <button type="button" class="tab-btn" onclick="showTab('ofertas')">🍿 Ofertas</button>
+                    <button type="button" class="tab-btn" onclick="showTab('banners')">📢 Publicidad</button>
                     <button type="button" class="tab-btn" onclick="showTab('estadisticas')">📊 Estadísticas</button>
                     <button type="button" class="tab-btn" onclick="showTab('admin')">💼 Admin</button>
                 </div>
@@ -558,6 +634,13 @@
                         <input type="text" id="clienteTelefono" placeholder="Teléfono" class="input-field">
                         <input type="email" id="clienteEmail" placeholder="Email" class="input-field">
                         <input type="text" id="clienteReferencia" placeholder="Referencia / detalle (opcional)" class="input-field">
+                        <label style="display:block;margin:10px 0 4px;color:#b0b0b0;font-size:0.9rem;">
+                            Logo del local (se recorta cuadrado automáticamente)
+                        </label>
+                        <input type="file" id="clienteLogoInput" accept="image/*" class="input-field" onchange="previsualizarLogoCliente(event)">
+                        <div id="clienteLogoPreview" style="display:none;margin:10px 0;">
+                            <img src="" alt="Preview" style="width:80px;height:80px;border-radius:10px;object-fit:cover;border:1px solid #2a2a2a;">
+                        </div>
                         <div class="form-actions">
                             <button type="button" onclick="crearCliente()" class="btn-primary">Guardar</button>
                             <button type="button" onclick="hideForm('cliente')" class="btn-secondary">Cancelar</button>
@@ -658,6 +741,39 @@
                     <div id="listaOfertas" class="card-grid"></div>
                 </div>
 
+                <!-- TAB PUBLICIDAD (banners laterales de la landing) -->
+                <div id="tabBanners" class="tab-content" style="display:none;">
+                    <div class="action-bar">
+                        <h3>📢 Banners de publicidad</h3>
+                        <button type="button" onclick="showForm('banner')" class="btn-success">+ Nuevo Banner</button>
+                    </div>
+                    <p style="color:#b0b0b0;font-size:0.9rem;margin:0 0 18px;">
+                        Se muestran a los costados de la página pública, en pantallas anchas.
+                        En celulares no aparecen, para no tapar las ofertas.
+                    </p>
+                    <div id="bannerForm" class="form-container" style="display:none;">
+                        <h4>Nuevo Banner</h4>
+                        <input type="text" id="bannerTitulo" placeholder="Nombre para identificarlo (ej: Panadería López)" class="input-field">
+                        <input type="text" id="bannerLink" placeholder="Enlace al hacer clic (opcional, con https://)" class="input-field">
+                        <select id="bannerLado" class="input-field">
+                            <option value="izquierda">⬅️ Columna izquierda</option>
+                            <option value="derecha">➡️ Columna derecha</option>
+                        </select>
+                        <label style="display:block;margin:10px 0 4px;color:#b0b0b0;font-size:0.9rem;">
+                            Imagen vertical (ideal 300x600px)
+                        </label>
+                        <input type="file" id="bannerImagenInput" accept="image/*" class="input-field" onchange="previsualizarImagenBanner(event)">
+                        <div id="bannerImagenPreview" style="display:none;margin:10px 0;">
+                            <img src="" alt="Preview" style="width:100px;border-radius:8px;border:1px solid #2a2a2a;">
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" onclick="crearBanner()" class="btn-primary">Guardar</button>
+                            <button type="button" onclick="hideForm('banner')" class="btn-secondary">Cancelar</button>
+                        </div>
+                    </div>
+                    <div id="listaBanners" class="card-grid"></div>
+                </div>
+
                 <!-- TAB ESTADÍSTICAS -->
                 <div id="tabEstadisticas" class="tab-content" style="display:none;">
                     <div class="action-bar">
@@ -677,8 +793,21 @@
                         <h3>💰 Liquidación del Administrador</h3>
                     </div>
                     <div class="card" style="max-width:400px;margin:0 auto;">
-                        <h4>Total Ganado</h4>
+                        <h4>Disponible para retirar</h4>
                         <p style="font-size:2.5rem;color:#ff6b35;text-align:center;margin:20px 0;" id="totalAdmin">$0</p>
+                        <button type="button" onclick="pagarLiquidacionAdmin()" class="btn-success" style="width:100%;">
+                            💵 Registrar retiro
+                        </button>
+                        <p style="color:#888;font-size:0.82rem;margin:10px 0 0;text-align:center;">
+                            El total vuelve a cero y queda asentado abajo.
+                        </p>
+                    </div>
+
+                    <div class="action-bar" style="margin-top:36px;">
+                        <h3>📜 Historial de retiros</h3>
+                    </div>
+                    <div class="card" style="max-width:400px;margin:0 auto;">
+                        <div id="historialAdmin"></div>
                     </div>
 
                     <div class="action-bar" style="margin-top:36px;">
@@ -776,8 +905,8 @@
     <!-- El ?v= fuerza al navegador a bajar el JS nuevo cuando cambia el HTML.
          Sin esto queda sirviendo scripts viejos de caché y la página falla.
          Subir el número en cada cambio de firebase-config.js o app.js. -->
-    <script src="firebase-config.js?v=5"></script>
-    <script src="app.js?v=5"></script>
+    <script src="firebase-config.js?v=6"></script>
+    <script src="app.js?v=6"></script>
 
     <!-- Cloudflare Web Analytics: mide visitas sin cookies, por eso no hace falta
          cartel de consentimiento. Va con snippet manual porque el tráfico no pasa
@@ -795,6 +924,7 @@
         }
 
         let configCache = {};
+        let bannersLanding = [];
 
         // Se usa si nadie cargó una URL distinta desde el panel de administración.
         const FORM_REPARTIDORES_POR_DEFECTO =
@@ -809,18 +939,23 @@
                 const pedirConfig = typeof f.getConfig === 'function'
                     ? f.getConfig().catch(() => ({}))
                     : Promise.resolve({});
+                const pedirBanners = typeof f.getBanners === 'function'
+                    ? f.getBanners().catch(() => [])
+                    : Promise.resolve([]);
 
-                [categoriasCache, ofertasCache, clientesCache, configCache] = await Promise.all([
+                [categoriasCache, ofertasCache, clientesCache, configCache, bannersLanding] = await Promise.all([
                     f.getCategorias(),
                     f.getOfertas(),
                     f.getClientes(),
-                    pedirConfig
+                    pedirConfig,
+                    pedirBanners
                 ]);
                 categoriasCache.sort((a, b) => (a.orden || 0) - (b.orden || 0));
                 poblarFiltroCategorias();
                 poblarFiltroLocales();
                 renderSoporte();
                 renderRepartidor();
+                renderBanners();
                 renderLanding();
             } catch (error) {
                 console.error('Error cargando la landing:', error);
@@ -949,6 +1084,9 @@
 
             cont.innerHTML = `
                 <div class="ficha-local">
+                  <div class="ficha-encabezado">
+                    ${c.logoUrl ? `<img class="local-logo" src="${c.logoUrl}" alt="${esc(c.nombre)}">` : ''}
+                    <div>
                     <h2>${esc(c.nombre)}</h2>
                     ${c.direccion ? `<p class="ficha-dato">📍 <span>${esc(c.direccion)}</span></p>` : ''}
                     ${c.telefono ? `<p class="ficha-dato">📞 <a href="tel:${esc(tel)}">${esc(c.telefono)}</a></p>` : ''}
@@ -957,6 +1095,8 @@
                         ? `<a class="btn-whatsapp" href="https://wa.me/${tel}?text=${mensaje}" target="_blank" rel="noopener noreferrer"
                               onclick="return metrica('registrarWhatsappLocal', ${c.id})">Escribir por WhatsApp</a>`
                         : ''}
+                    </div>
+                  </div>
                 </div>
             `;
         }
@@ -1002,7 +1142,12 @@
                                         ? `<img class="poster-img" src="${o.imagenUrl}" alt="${esc(o.titulo)}">`
                                         : `<div class="poster-img poster-placeholder">🍽️</div>`}
                                     <div class="poster-titulo">${esc(o.titulo)}</div>
-                                    <div class="poster-local">${esc(nombreLocal(o.clienteId))}</div>
+                                    <div class="poster-local">${(() => {
+                                        const lc = localPorId(o.clienteId);
+                                        const logo = lc && lc.logoUrl
+                                            ? `<img class="poster-local-logo" src="${lc.logoUrl}" alt="">` : '';
+                                        return logo + esc(nombreLocal(o.clienteId));
+                                    })()}</div>
                                 </div>
                             `).join('')}
                         </div>
@@ -1026,6 +1171,24 @@
                     📱 ${esc(configCache.telefonoSoporte)}
                 </a>
             `;
+        }
+
+        function renderBanners() {
+            ['izquierda', 'derecha'].forEach(lado => {
+                const cont = document.getElementById('banners' + lado.charAt(0).toUpperCase() + lado.slice(1));
+                if (!cont) return;
+
+                const delLado = (bannersLanding || []).filter(b => b.activo && b.lado === lado && b.imagenUrl);
+                if (delLado.length === 0) { cont.innerHTML = ''; return; }
+
+                cont.innerHTML = '<p class="banner-leyenda">Publicidad</p>' + delLado.map(b => {
+                    const img = `<img src="${b.imagenUrl}" alt="${esc(b.titulo || 'Publicidad')}" loading="lazy">`;
+                    // Solo se hace clickeable si el enlace es http(s): evita un javascript: en el href.
+                    return (b.link && /^https?:\/\//i.test(b.link))
+                        ? `<a class="banner-item" href="${esc(b.link)}" target="_blank" rel="noopener noreferrer sponsored">${img}</a>`
+                        : `<div class="banner-item">${img}</div>`;
+                }).join('');
+            });
         }
 
         function renderRepartidor() {
@@ -1065,7 +1228,10 @@
                         ${o.descripcion ? `<p class="modal-desc">${esc(o.descripcion)}</p>` : ''}
                         ${o.precio != null ? `<p class="modal-precio">$${esc(o.precio)}</p>` : ''}
                         <div class="modal-local-box">
-                            <p class="modal-local-nombre">${cliente ? esc(cliente.nombre) : 'Local'}</p>
+                            <div class="modal-local-encabezado">
+                                ${cliente && cliente.logoUrl ? `<img class="local-logo" src="${cliente.logoUrl}" alt="${esc(cliente.nombre)}">` : ''}
+                                <p class="modal-local-nombre" style="margin:0;">${cliente ? esc(cliente.nombre) : 'Local'}</p>
+                            </div>
                             ${cliente && cliente.direccion ? `<p class="modal-local-dato">📍 <span>${esc(cliente.direccion)}</span></p>` : ''}
                             ${cliente && cliente.telefono ? `<p class="modal-local-dato">📞 <a href="tel:${esc(telefono)}">${esc(cliente.telefono)}</a></p>` : ''}
                         </div>

@@ -499,6 +499,70 @@ async function getMetricas() {
 }
 
 // ============================================================
+// 💼 HISTORIAL DE LIQUIDACIONES DEL ADMINISTRADOR
+// ============================================================
+// Va en su propio nodo, separado del historial de repartidores, porque son dos
+// cuentas distintas: lo que cobra el admin no es un pago a nadie.
+
+async function getHistorialAdmin() {
+    try {
+        const snapshot = await database.ref('historialLiquidacionAdmin').once('value');
+        const data = snapshot.val();
+        if (!data) return [];
+        return Array.isArray(data) ? data.filter(Boolean) : Object.values(data);
+    } catch (error) {
+        console.error('Error obteniendo historial del admin:', error);
+        return [];
+    }
+}
+
+async function setHistorialAdmin(lista) {
+    try {
+        await database.ref('historialLiquidacionAdmin').set(lista);
+        return true;
+    } catch (error) {
+        console.error('Error guardando historial del admin:', error);
+        return false;
+    }
+}
+
+// ============================================================
+// 📢 BANNERS DE PUBLICIDAD (laterales de la landing)
+// ============================================================
+
+async function getBanners() {
+    try {
+        const snapshot = await database.ref('banners').once('value');
+        const data = snapshot.val();
+        if (!data) return [];
+        return Object.keys(data).map(key => ({ id: parseInt(key), ...data[key] }));
+    } catch (error) {
+        console.error('Error obteniendo banners:', error);
+        return [];
+    }
+}
+
+async function setBanner(id, data) {
+    try {
+        await database.ref('banners/' + id).set(data);
+        return true;
+    } catch (error) {
+        console.error('Error guardando banner:', error);
+        return false;
+    }
+}
+
+async function deleteBanner(id) {
+    try {
+        await database.ref('banners/' + id).remove();
+        return true;
+    } catch (error) {
+        console.error('Error eliminando banner:', error);
+        return false;
+    }
+}
+
+// ============================================================
 // 📦 CRUD — CATEGORÍAS (landing estilo Netflix)
 // ============================================================
 
@@ -641,6 +705,11 @@ window.firebaseFunctions = {
     registrarFiltroCategoria,
     registrarBusquedaSinResultado,
     getMetricas,
+    getHistorialAdmin,
+    setHistorialAdmin,
+    getBanners,
+    setBanner,
+    deleteBanner,
     getCategorias,
     setCategoria,
     deleteCategoria,
